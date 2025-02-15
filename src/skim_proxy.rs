@@ -1,9 +1,11 @@
 use skim::prelude::*;
 use std::fs;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::str::FromStr;
 use anyhow::Result;
-use crate::preview::generate_preview;
+
+use crate::PathHopper;
 
 #[derive(Clone)]
 struct ItemStruct {
@@ -20,24 +22,25 @@ impl SkimItem for ItemStruct {
     }
 }
 
-pub fn call_skim(config_file: &PathBuf) -> Result<()> {
+pub fn call_skim(hopper: &PathHopper) -> Result<()> {
     let options = SkimOptionsBuilder::default()
         .height("100%".to_string())
         .multi(true)
         .preview_fn(Some(PreviewCallback::from(|items: Vec<Arc<dyn SkimItem>>| {
-            items.iter().map(|item| {  
-                let preview = generate_preview(Path::new(item.text().as_ref()));
-                preview.iter().map(|i|{
-                    AnsiString::parse(&i.to_string())
+            items.iter().map(|item| {
+                let path = PathBuf::from_str(item.text().as_ref()).unwrap();
+                let preview = PathHopper::get_entry_preview(&path).unwrap();
+                preview.split("\n").map(|line| {
+                    AnsiString::parse(line)
                 }).collect::<Vec<_>>()
-            }).flatten().collect()
+            }).flatten().collect::<Vec<_>>()
         })))
         .bind(vec!["ctrl-/:toggle-preview".to_string(), "?:toggle-preview".to_string()])
         .color(Some("fg:252,bg:234,preview-fg:252,preview-bg:234".to_string()))
         .build()
         .unwrap();
     
-    let items: Vec<ItemStruct> = fs::read_to_string(config_file)?
+    let items: Vec<ItemStruct> = fs::read_to_string(&hopper.get_config_file())?
         .lines()
         .map(|line| ItemStruct { text: line.to_string() })
         .collect();

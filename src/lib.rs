@@ -1,15 +1,16 @@
 use anyhow::{anyhow, Context, Result};
+use entry::{directory::DirectoryEntry, file::FileEntry, repository::RepositoryEntry, Entry};
 use std::{
-    fs::{self, File},
-    io::{BufRead, BufReader, Write},
-    path::{Path, PathBuf},
+    borrow::Cow, fs::{self, File}, io::{BufRead, BufReader, Write}, path::{Path, PathBuf}
 };
 use git2::Repository;
 use clap::Parser;
 
-pub mod preview;
 pub mod cli;
 pub mod skim_proxy;
+pub mod entry;
+#[cfg(test)]
+pub mod test_helper;
 
 pub fn run() -> anyhow::Result<()> {
     let config_dir = std::env::var("PATH_HOPPER_CONFIG_DIR")
@@ -24,7 +25,7 @@ pub fn run() -> anyhow::Result<()> {
             }
         },
         Some(cli::Commands::Clean) => hopper.remove_nonexistent_paths(),
-        None => skim_proxy::call_skim(&hopper.get_config_file()),
+        None => skim_proxy::call_skim(&hopper),
     }
 }
 
@@ -42,6 +43,18 @@ impl PathHopper {
             File::create(&config_file)?;
         }
         Ok(Self { config_file })
+    }
+
+    pub fn get_entry_preview(path: &PathBuf) -> Result<Cow<'static, str>> {
+        if path.is_dir() {
+            if Self::is_git_repo(path) {
+                Ok(RepositoryEntry::new(path.clone()).get_preview().into())
+            } else {
+                Ok(DirectoryEntry::new(path.clone(), None, None).get_preview().into())
+            }
+        } else {
+            Ok(FileEntry::new(path.clone()).get_preview().into())
+        }
     }
 
     fn contains_dir(&self, git_dir: &PathBuf) -> Result<bool> {

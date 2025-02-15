@@ -1,0 +1,9 @@
+use std::path::PathBuf;
+use std::borrow::Cow;
+pub mod file;
+pub mod directory;
+pub mod repository;
+pub trait Entry {
+    fn get_path(&self) -> &PathBuf;
+    fn get_preview(&self) -> Cow<'static, str>;
+}
