@@ -1,4 +1,4 @@
-use repos_hopper::run;
+use path_hopper::run;
 
 fn main() -> anyhow::Result<()> {
     run()

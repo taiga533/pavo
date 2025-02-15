@@ -938,6 +938,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "path-hopper"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "chrono",
+ "clap",
+ "colored",
+ "dirs",
+ "git2",
+ "pretty_assertions",
+ "skim",
+ "tempfile",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1081,22 +1097,6 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
-
-[[package]]
-name = "repos-hopper"
-version = "0.1.0"
-dependencies = [
- "ansi_term",
- "anyhow",
- "chrono",
- "clap",
- "colored",
- "dirs",
- "git2",
- "pretty_assertions",
- "skim",
- "tempfile",
-]
 
 [[package]]
 name = "rustix"
