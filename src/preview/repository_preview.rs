@@ -1,8 +1,8 @@
 use colored::{ColoredString, Colorize};
-use git2::{Repository, Sort};
+use git2::Repository;
 use std::path::PathBuf;
 
-use super::formatters::{BranchFormatter, CommitFormatter, StatusFormatter};
+use super::formatters::{BranchFormatter, CommitFormatter};
 
 pub struct RepositoryPreview {
     path: PathBuf,
@@ -27,8 +27,6 @@ impl RepositoryPreview {
         if let Some(repo) = &self.repo {
             preview.extend(self.generate_branch_info(repo));
             preview.extend(self.generate_latest_commit_info(repo));
-            preview.extend(self.generate_status_info(repo));
-            preview.extend(self.generate_commit_history(repo));
         } else if self.path.exists() {
             preview.push("⚠️  これはgitリポジトリではありません\n".normal());
         } else {
@@ -59,39 +57,6 @@ impl RepositoryPreview {
         if let Ok(head) = repo.head() {
             if let Ok(commit) = head.peel_to_commit() {
                 preview.extend(CommitFormatter::format_latest_commit(&commit));
-            }
-        }
-        preview
-    }
-
-    fn generate_status_info(&self, repo: &Repository) -> Vec<ColoredString> {
-        let mut preview = Vec::new();
-        if let Ok(statuses) = repo.statuses(None) {
-            if !statuses.is_empty() {
-                preview.push(format!("{}\n", "📝 変更状態:").red().bold());
-                for entry in statuses.iter() {
-                    let status = StatusFormatter::format(entry.status());
-                    let path = entry.path().unwrap_or_default();
-                    preview.push(format!("  {}{}\n", status, path).red());
-                }
-                preview.push("\n".normal());
-            }
-        }
-        preview
-    }
-
-    fn generate_commit_history(&self, repo: &Repository) -> Vec<ColoredString> {
-        let mut preview = Vec::new();
-        preview.push(format!("{}\n\n", "📜 コミット履歴:").yellow().bold());
-
-        if let Ok(mut revwalk) = repo.revwalk() {
-            revwalk.set_sorting(Sort::TIME).unwrap_or_default();
-            revwalk.push_head().unwrap_or_default();
-
-            for commit_id in revwalk.take(10).filter_map(Result::ok) {
-                if let Ok(commit) = repo.find_commit(commit_id) {
-                    preview.extend(CommitFormatter::format_commit_history_entry(&commit));
-                }
             }
         }
         preview
