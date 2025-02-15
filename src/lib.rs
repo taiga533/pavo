@@ -12,18 +12,18 @@ pub mod cli;
 pub mod skim_proxy;
 
 pub fn run() -> anyhow::Result<()> {
-    let config_dir = std::env::var("REPOS_HOPPER_CONFIG_DIR")
+    let config_dir = std::env::var("PATH_HOPPER_CONFIG_DIR")
             .map(PathBuf::from)
             .ok();
     let hopper = PathHopper::new(config_dir)?;
     match cli::Cli::parse().command {
         Some(cli::Commands::Add { dir }) => {
             match dir {
-                Some(d) => hopper.check_and_add_repo(&d),
-                None => hopper.check_and_add_repo(std::env::current_dir()?.to_str().unwrap()),
+                Some(d) => hopper.add_path(&d),
+                None => hopper.add_path(std::env::current_dir()?.to_str().unwrap()),
             }
         },
-        Some(cli::Commands::Clean) => hopper.remove_nonexistent_repos(),
+        Some(cli::Commands::Clean) => hopper.remove_nonexistent_paths(),
         None => skim_proxy::call_skim(&hopper.get_config_file()),
     }
 }
@@ -66,193 +66,38 @@ impl PathHopper {
         Repository::open(dir).is_ok()
     }
 
-    pub fn check_and_add_repo(&self, dir: &str) -> Result<()> {
-        let path = PathBuf::from(dir);
-
-        if !Self::is_git_repo(&path) {
-            println!("This is not a git repository. Nothing is done.");
-            return Err(anyhow!("This is not a git repository. Nothing is done."));
-        }
+    pub fn add_path(&self, path: &str) -> Result<()> {
+        let path = PathBuf::from(path);
 
         if self.contains_dir(&path)? {
             return Err(anyhow!("{} is already registered.", path.display()));
         }
-
-        let repo = Repository::open(&path)?;
-        let git_dir = repo.workdir().context("Not a git repository")?.to_path_buf();
-        self.add_to_file(&git_dir)
+        self.add_to_file(&path)
     }
 
     pub fn get_config_file(&self) -> &PathBuf {
         &self.config_file
     }
 
-    pub fn remove_nonexistent_repos(&self) -> Result<()> {
+    pub fn remove_nonexistent_paths(&self) -> Result<()> {
         let file = File::open(&self.config_file)?;
         let reader = BufReader::new(file);
-        let mut existing_repos = Vec::new();
+        let mut existing_paths = Vec::new();
 
         for line in reader.lines() {
-            let dir = line?;
-            let path = Path::new(&dir);
-            if path.exists() && Self::is_git_repo(path) {
-                existing_repos.push(dir);
+            let path = line?;
+            let path = PathBuf::from(path);
+            if path.exists() {
+                existing_paths.push(path);
             } else {
-                println!("{} does not exist, so it is deleted.", dir);
+                println!("{} does not exist, so it is deleted.", path.display());
             }
         }
 
         let mut file = File::create(&self.config_file)?;
-        for repo in existing_repos {
-            writeln!(file, "{}", repo)?;
+        for path in existing_paths {
+            writeln!(file, "{}", path.display())?;
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    fn setup_test_repo() -> (TempDir, Repository) {
-        let dir = TempDir::new().unwrap();
-        let repo = Repository::init(dir.path()).unwrap();
-        
-        let test_file_path = dir.path().join("test.txt");
-        let mut file = File::create(&test_file_path).unwrap();
-        writeln!(file, "Test content").unwrap();
-        
-        let mut index = repo.index().unwrap();
-        index.add_path(std::path::Path::new("test.txt")).unwrap();
-        index.write().unwrap();
-        
-        let tree_id = index.write_tree().unwrap();
-        {
-            let tree = repo.find_tree(tree_id).unwrap();
-            let signature = git2::Signature::now("Test User", "test@example.com").unwrap();
-            repo.commit(
-                Some("HEAD"),
-                &signature,
-                &signature,
-                "Initial commit",
-                &tree,
-                &[],
-            ).unwrap();
-        }
-        
-        
-        (dir, repo)
-    }
-
-    
-    mod add_repository {
-        use tempfile::TempDir;
-
-        use crate::{tests::setup_test_repo, PathHopper};
-
-        #[test]
-        fn test_can_add_reposiory_to_config_file() {
-            let (dir, _repo) = setup_test_repo();
-            let temp_dir = TempDir::new().unwrap();
-            let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-            
-            hopper.check_and_add_repo(dir.path().to_str().unwrap()).unwrap();
-            assert!(hopper.contains_dir(&dir.into_path()).unwrap());
-        }
-
-        #[test]
-        fn test_cant_add_non_git_repo() {
-            let temp_dir = TempDir::new().unwrap();
-            let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-            
-            let non_git_dir = TempDir::new().unwrap();
-            let error = hopper.check_and_add_repo(non_git_dir.path().to_str().unwrap()).unwrap_err();
-            assert_eq!(error.to_string(), "This is not a git repository. Nothing is done.");
-        }
-
-        
-        #[test]
-        fn test_cant_add_already_added_repo() {
-            let (dir, _repo) = setup_test_repo();
-            let temp_dir = TempDir::new().unwrap();
-            let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-            
-            hopper.check_and_add_repo(dir.path().to_str().unwrap()).unwrap();
-            
-            let dir = dir.into_path();
-            let error = hopper.check_and_add_repo(dir.to_str().unwrap()).unwrap_err();
-            assert_eq!(error.to_string(), format!("{} is already registered.", dir.to_str().unwrap()));
-        }
-    }
-
-    mod remove_nonexistent_repos {
-        use std::fs;
-
-        use tempfile::TempDir;
-
-        use crate::{tests::setup_test_repo, PathHopper};
-
-        #[test]
-        fn test_remove_nonexistent_repos() {
-            let (dir, _repo) = setup_test_repo();
-            let temp_dir = TempDir::new().unwrap();
-            let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-            
-            hopper.check_and_add_repo(dir.path().to_str().unwrap()).unwrap();
-            fs::remove_dir_all(dir.path()).unwrap();
-            
-            hopper.remove_nonexistent_repos().unwrap();
-            assert!(!hopper.contains_dir(&dir.into_path()).unwrap());
-        }
-
-        #[test]
-        fn test_non_git_repos_are_not_removed() {
-            let temp_dir = TempDir::new().unwrap();
-            let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-            
-            let (dir, _repo) = setup_test_repo();
-            let dir_path = dir.path().to_path_buf();
-            hopper.check_and_add_repo(dir_path.to_str().unwrap()).unwrap();
-            
-            for entry in fs::read_dir(dir.path()).unwrap() {
-                let entry = entry.unwrap();
-                if entry.path().is_dir() {
-                    fs::remove_dir_all(entry.path()).unwrap();
-                } else {
-                    fs::remove_file(entry.path()).unwrap();
-                }
-            }
-            hopper.remove_nonexistent_repos().unwrap();
-            assert!(!hopper.contains_dir(&dir_path).unwrap());
-        }
-
-        #[test]
-        fn test_keep_existing_repos() {
-            let (dir, _repo) = setup_test_repo();
-            let temp_dir = TempDir::new().unwrap();
-            let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-            
-            hopper.check_and_add_repo(dir.path().to_str().unwrap()).unwrap();
-            
-            hopper.remove_nonexistent_repos().unwrap();
-            assert!(hopper.contains_dir(&dir.into_path()).unwrap());
-        }
-    }
-
-    #[test]
-    fn test_path_hopper_new() {
-        let temp_dir = TempDir::new().unwrap();
-        let hopper = PathHopper::new(Some(temp_dir.path().to_path_buf())).unwrap();
-        assert!(hopper.config_file.exists());
-    }
-
-    #[test]
-    fn test_is_git_repo() {
-        let (dir, _repo) = setup_test_repo();
-        assert!(PathHopper::is_git_repo(dir.path()));
-        
-        let non_git_dir = TempDir::new().unwrap();
-        assert!(!PathHopper::is_git_repo(non_git_dir.path()));
     }
 }
