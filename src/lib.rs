@@ -60,7 +60,7 @@ impl PathHopper {
             .append(true)
             .open(&self.config_file)?;
         writeln!(file, "{}", git_dir.display())?;
-        println!("{} を登録しました。", git_dir.display());
+        println!("{} is registered.", git_dir.display());
         Ok(())
     }
 
@@ -72,12 +72,12 @@ impl PathHopper {
         let path = PathBuf::from(dir);
 
         if !Self::is_git_repo(&path) {
-            println!("これはgitリポジトリではありません。何も行いません。");
-            return Err(anyhow!("これはgitリポジトリではありません。何も行いません。"));
+            println!("This is not a git repository. Nothing is done.");
+            return Err(anyhow!("This is not a git repository. Nothing is done."));
         }
 
         if self.contains_dir(&path)? {
-            return Err(anyhow!("{} はすでに登録されています。", path.display()));
+            return Err(anyhow!("{} is already registered.", path.display()));
         }
 
         let repo = Repository::open(&path)?;
@@ -142,7 +142,7 @@ impl PathHopper {
             if path.exists() && Self::is_git_repo(path) {
                 existing_repos.push(dir);
             } else {
-                println!("{} は存在しないため、削除します。", dir);
+                println!("{} does not exist, so it is deleted.", dir);
             }
         }
 
@@ -230,7 +230,7 @@ mod tests {
             
             let non_git_dir = TempDir::new().unwrap();
             let error = hopper.check_and_add_repo(non_git_dir.path().to_str().unwrap()).unwrap_err();
-            assert_eq!(error.to_string(), "これはgitリポジトリではありません。何も行いません。");
+            assert_eq!(error.to_string(), "This is not a git repository. Nothing is done.");
         }
 
         
@@ -244,7 +244,7 @@ mod tests {
             
             let dir = dir.into_path();
             let error = hopper.check_and_add_repo(dir.to_str().unwrap()).unwrap_err();
-            assert_eq!(error.to_string(), format!("{} はすでに登録されています。", dir.to_str().unwrap()));
+            assert_eq!(error.to_string(), format!("{} is already registered.", dir.to_str().unwrap()));
         }
     }
 

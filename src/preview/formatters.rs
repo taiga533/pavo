@@ -6,7 +6,7 @@ pub struct BranchFormatter;
 impl CommitFormatter {
     pub fn format_latest_commit(commit: &git2::Commit) -> Vec<ColoredString> {
         let mut lines = Vec::new();
-        lines.push(format!("\n📌 {}\n", "最新のコミット:").yellow().bold());
+        lines.push(format!("\n📌 {}\n", "Latest Commit:").yellow().bold());
         lines.push(format!("commit {}\n", commit.id().to_string()).yellow());
         lines.push(format!("Author: {}\n", commit.author()).normal());
         if let Some(msg) = commit.message() {
@@ -22,7 +22,7 @@ impl BranchFormatter {
         let mut preview = Vec::new();
         if let Some(branch_name) = head.shorthand() {
             preview.push(
-                format!("🌿 {}: {}\n", "ブランチ".blue(), branch_name.green()).normal()
+                format!("🌿 {}: {}\n", "Branch".blue(), branch_name.green()).normal()
             );
         }
         preview

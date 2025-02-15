@@ -10,13 +10,13 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// 指定したディレクトリを設定ファイルに追加します
-    /// 引数なしの場合は現在のディレクトリを追加します
+    /// Add a directory to the configuration file
+    /// If no argument is provided, the current directory will be added
     Add {
         #[arg(name = "DIR")]
         dir: Option<String>,
     },
-    /// 存在しないリポジトリを設定ファイルから削除します
+    /// Remove a non-existent repository from the configuration file
     Clean,
 }
 

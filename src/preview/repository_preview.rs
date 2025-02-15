@@ -28,9 +28,9 @@ impl RepositoryPreview {
             preview.extend(self.generate_branch_info(repo));
             preview.extend(self.generate_latest_commit_info(repo));
         } else if self.path.exists() {
-            preview.push("⚠️  これはgitリポジトリではありません\n".normal());
+            preview.push("⚠️  This is not a git repository\n".normal());
         } else {
-            preview.push("⚠️  リポジトリが存在しません\n".normal());
+            preview.push("⚠️  Repository does not exist\n".normal());
         }
 
         preview
@@ -120,7 +120,7 @@ mod tests {
     fn test_repository_preview_nonexistent() {
         let preview = RepositoryPreview::new(PathBuf::from("/nonexistent/path"));
         let output = preview.generate();
-        assert!(output.iter().any(|line| line.to_string().contains("リポジトリが存在しません")));
+        assert!(output.iter().any(|line| line.to_string().contains("Repository does not exist")));
     }
 
     #[test]
@@ -128,6 +128,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let preview = RepositoryPreview::new(dir.path().to_path_buf());
         let output = preview.generate();
-        assert!(output.iter().any(|line| line.to_string().contains("gitリポジトリではありません")));
+        assert!(output.iter().any(|line| line.to_string().contains("This is not a git repository")));
     }
 }
