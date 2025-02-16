@@ -65,9 +65,6 @@ impl RepositoryEntry {
 }
 
 impl Entry for RepositoryEntry {
-    fn get_path(&self) -> &PathBuf {
-        &self.path
-    }
 
     fn get_preview(&self) -> Cow<'static, str> {
         let mut preview = String::new();
