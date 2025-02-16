@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use anyhow::Result;
 
-use crate::PathHopper;
+use crate::Pavo;
 
 #[derive(Clone)]
 struct ItemStruct {
@@ -22,14 +22,14 @@ impl SkimItem for ItemStruct {
     }
 }
 
-pub fn call_skim(hopper: &PathHopper) -> Result<()> {
+pub fn call_skim(hopper: &Pavo) -> Result<()> {
     let options = SkimOptionsBuilder::default()
         .height("100%".to_string())
         .multi(true)
         .preview_fn(Some(PreviewCallback::from(|items: Vec<Arc<dyn SkimItem>>| {
             items.iter().map(|item| {
                 let path = PathBuf::from_str(item.text().as_ref()).unwrap();
-                let preview = PathHopper::get_entry_preview(&path).unwrap();
+                let preview = Pavo::get_entry_preview(&path).unwrap();
                 preview.split("\n").map(|line| {
                     AnsiString::parse(line)
                 }).collect::<Vec<_>>()

@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "path-hopper")]
+#[command(name = "pavo")]
 #[command(about = "Git repository management tool")]
 pub struct Cli {
     #[command(subcommand)]
@@ -26,7 +26,7 @@ mod tests {
 
     #[test]
     fn test_cli_add_with_dir() {
-        let cli = Cli::try_parse_from(&["path-hopper", "add", "/path/to/entry"]).unwrap();
+        let cli = Cli::try_parse_from(&["pavo", "add", "/path/to/entry"]).unwrap();
         match cli.command {
             Some(Commands::Add { dir }) => {
                 assert_eq!(dir, Some("/path/to/entry".to_string()));
@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn test_cli_add_without_dir() {
-        let cli = Cli::try_parse_from(&["path-hopper", "add"]).unwrap();
+        let cli = Cli::try_parse_from(&["pavo", "add"]).unwrap();
         assert!(cli.command.is_some());
         match cli.command {
             Some(Commands::Add { dir }) => {

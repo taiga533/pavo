@@ -1,4 +1,4 @@
-use path_hopper::run;
+use pavo::run;
 
 fn main() -> anyhow::Result<()> {
     run()

@@ -16,7 +16,7 @@ pub fn run() -> anyhow::Result<()> {
     let config_dir = std::env::var("PATH_HOPPER_CONFIG_DIR")
             .map(PathBuf::from)
             .ok();
-    let hopper = PathHopper::new(config_dir)?;
+    let hopper = Pavo::new(config_dir)?;
     match cli::Cli::parse().command {
         Some(cli::Commands::Add { dir }) => {
             match dir {
@@ -29,12 +29,12 @@ pub fn run() -> anyhow::Result<()> {
     }
 }
 
-pub struct PathHopper {
+pub struct Pavo {
     config_file: PathBuf,
 }
 
 
-impl PathHopper {
+impl Pavo {
     pub fn new(config_dir: Option<PathBuf>) -> Result<Self> {
         let config_dir = config_dir.or_else(|| dirs::config_dir()).context("Could not find config directory")?;
         fs::create_dir_all(&config_dir)?;
@@ -114,3 +114,4 @@ impl PathHopper {
         Ok(())
     }
 }
+
