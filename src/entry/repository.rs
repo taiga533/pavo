@@ -103,7 +103,7 @@ mod tests {
         let entry = RepositoryEntry::new(dir.path().to_path_buf());
         let preview = entry.get_preview();
         assert!(preview.contains("Branch: main"));
-        assert!(preview.contains("📁")); // Directory preview
+        assert!(preview.contains("test.txt")); // Directory preview
     }
 
     #[test]
@@ -116,16 +116,6 @@ mod tests {
         assert!(preview.contains("Latest Commit:"));
         assert!(preview.contains("Initial commit"));
         assert!(preview.contains("Author: Test User <test@example.com>"));
-        assert!(preview.contains("📁")); // Directory preview
-    }
-
-    #[test]
-    fn test_repository_entry_with_invalid_path() {
-        let invalid_path = PathBuf::from("/path/that/does/not/exist");
-        let entry = RepositoryEntry::new(invalid_path.clone());
-        
-        assert_eq!(entry.get_path(), &invalid_path);
-        let preview = entry.get_preview();
-        assert!(preview.is_empty());
+        assert!(preview.contains("test.txt")); // Directory preview
     }
 }

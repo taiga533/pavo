@@ -53,7 +53,7 @@ impl PathHopper {
                 Ok(DirectoryEntry::new(path.clone(), None, None).get_preview().into())
             }
         } else {
-            Ok(FileEntry::new(path.clone()).get_preview().into())
+            Ok(FileEntry::new(path.clone(), None).get_preview().into())
         }
     }
 
