@@ -20,7 +20,7 @@ pub enum Commands {
     Clean,
 
     /// Open the configuration file with the editor specified by the EDITOR environment variable
-    Edit,
+    Config,
 }
 
 #[cfg(test)]
