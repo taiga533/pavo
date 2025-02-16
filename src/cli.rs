@@ -18,6 +18,9 @@ pub enum Commands {
     },
     /// Remove a non-existent repository from the configuration file
     Clean,
+
+    /// Open the configuration file with the editor specified by the EDITOR environment variable
+    Edit,
 }
 
 #[cfg(test)]

@@ -22,7 +22,7 @@ impl SkimItem for ItemStruct {
     }
 }
 
-pub fn call_skim(hopper: &Pavo) -> Result<()> {
+pub fn call_skim(pavo: &Pavo) -> Result<()> {
     let options = SkimOptionsBuilder::default()
         .height("100%".to_string())
         .multi(true)
@@ -40,7 +40,7 @@ pub fn call_skim(hopper: &Pavo) -> Result<()> {
         .build()
         .unwrap();
     
-    let items: Vec<ItemStruct> = fs::read_to_string(&hopper.get_config_file())?
+    let items: Vec<ItemStruct> = fs::read_to_string(&pavo.get_config_file())?
         .lines()
         .map(|line| ItemStruct { text: line.to_string() })
         .collect();
