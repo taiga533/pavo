@@ -25,11 +25,14 @@ pub fn format_latest_commit(commit: &git2::Commit) -> Cow<'static, str> {
     lines.into()
 }
 
-
 pub fn format_branch_info(head: &Reference) -> Cow<'static, str> {
     let mut preview = String::new();
     if let Some(branch_name) = head.shorthand() {
-        preview.push_str(&format!("🌿 {}: {}\n", "Branch".blue(), branch_name.green()));
+        preview.push_str(&format!(
+            "🌿 {}: {}\n",
+            "Branch".blue(),
+            branch_name.green()
+        ));
     }
     preview.into()
 }
@@ -44,7 +47,7 @@ impl RepositoryEntry {
         Self { path, repo }
     }
 
-        fn generate_branch_info(&self) -> Result<Cow<'static, str>> {
+    fn generate_branch_info(&self) -> Result<Cow<'static, str>> {
         if let Some(repo) = &self.repo {
             let head = repo.head().with_context(|| "Failed to get head")?;
             Ok(format_branch_info(&head))
@@ -56,7 +59,9 @@ impl RepositoryEntry {
     fn generate_latest_commit_info(&self) -> Result<Cow<'static, str>> {
         if let Some(repo) = &self.repo {
             let head = repo.head().with_context(|| "Failed to get head")?;
-            let commit = head.peel_to_commit().with_context(|| "Failed to peel to commit")?;
+            let commit = head
+                .peel_to_commit()
+                .with_context(|| "Failed to peel to commit")?;
             Ok(format_latest_commit(&commit))
         } else {
             Err(anyhow::anyhow!("Failed to get repo"))
@@ -65,10 +70,9 @@ impl RepositoryEntry {
 }
 
 impl Entry for RepositoryEntry {
-
     fn get_preview(&self) -> Cow<'static, str> {
         let mut preview = String::new();
-        
+
         // Add git repository information
         if let Ok(branch_info) = self.generate_branch_info() {
             preview.push_str(&branch_info);

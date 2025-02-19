@@ -29,17 +29,19 @@ impl Default for Config {
         Self {
             paths: Vec::new(),
             auto_clean: true,
-            max_unselected_time: 60 * 60 * 24
+            max_unselected_time: 60 * 60 * 24,
         }
     }
 }
 
 impl Config {
     pub fn new(config_dir: Option<PathBuf>) -> Result<Self> {
-        let config_dir = config_dir.or_else(dirs::config_dir).context("Could not find config directory")?;
+        let config_dir = config_dir
+            .or_else(dirs::config_dir)
+            .context("Could not find config directory")?;
         fs::create_dir_all(&config_dir)?;
         let config_file = config_dir.join("pavo.toml");
-        
+
         if !config_file.exists() {
             let default_config = Self::default();
             default_config.save(&config_file)?;
@@ -78,7 +80,10 @@ impl Config {
         self.paths.retain(|config_path| {
             let exists = config_path.path.exists();
             if !exists {
-                println!("{} does not exist, so it is deleted.", config_path.path.display());
+                println!(
+                    "{} does not exist, so it is deleted.",
+                    config_path.path.display()
+                );
             }
             exists || config_path.persist
         });
@@ -87,8 +92,9 @@ impl Config {
     pub fn remove_old_paths(&mut self) {
         let now = chrono::Utc::now();
         self.paths.retain(|config_path| {
-            config_path.persist ||
-            now.signed_duration_since(config_path.last_selected) < chrono::Duration::seconds(self.max_unselected_time as i64)
+            config_path.persist
+                || now.signed_duration_since(config_path.last_selected)
+                    < chrono::Duration::seconds(self.max_unselected_time as i64)
         });
     }
 
@@ -100,9 +106,9 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
-    use std::fs;
     use chrono::Duration;
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_default_config_should_have_expected_values() {
@@ -149,17 +155,17 @@ mod tests {
     fn test_remove_nonexistent_paths_should_remove_invalid_paths() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default();
-        
+
         // Add existing path
         config.add_path(temp_dir.path().to_path_buf()).unwrap();
-        
+
         // Add path that will be deleted
         let deleted_dir = tempdir().unwrap();
         config.add_path(deleted_dir.path().to_path_buf()).unwrap();
-        
+
         // Delete the directory
         fs::remove_dir_all(deleted_dir.path()).unwrap();
-        
+
         config.remove_nonexistent_paths();
         assert_eq!(config.paths.len(), 1);
         assert_eq!(config.paths[0].path, temp_dir.path());
@@ -169,14 +175,14 @@ mod tests {
     fn test_remove_nonexistent_paths_should_keep_persisted_paths() {
         let deleted_dir = tempdir().unwrap();
         let mut config = Config::default();
-        
+
         // Add path that will be deleted but persisted
         config.add_path(deleted_dir.path().to_path_buf()).unwrap();
         config.paths[0].persist = true;
-        
+
         // Delete the directory
         fs::remove_dir_all(deleted_dir.path()).unwrap();
-        
+
         config.remove_nonexistent_paths();
         assert_eq!(config.paths.len(), 1);
     }
@@ -185,12 +191,13 @@ mod tests {
     fn test_remove_old_paths_should_remove_paths_older_than_max_time() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default();
-        
+
         // Add path with old timestamp
         config.add_path(temp_dir.path().to_path_buf()).unwrap();
-        let old_time = chrono::Utc::now() - Duration::seconds((config.max_unselected_time + 1) as i64);
+        let old_time =
+            chrono::Utc::now() - Duration::seconds((config.max_unselected_time + 1) as i64);
         config.paths[0].last_selected = old_time;
-        
+
         config.remove_old_paths();
         assert!(config.paths.is_empty());
     }
@@ -199,13 +206,14 @@ mod tests {
     fn test_remove_old_paths_should_keep_persisted_paths() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default();
-        
+
         // Add path with old timestamp but persisted
         config.add_path(temp_dir.path().to_path_buf()).unwrap();
-        let old_time = chrono::Utc::now() - Duration::seconds((config.max_unselected_time + 1) as i64);
+        let old_time =
+            chrono::Utc::now() - Duration::seconds((config.max_unselected_time + 1) as i64);
         config.paths[0].last_selected = old_time;
         config.paths[0].persist = true;
-        
+
         config.remove_old_paths();
         assert_eq!(config.paths.len(), 1);
     }
@@ -228,13 +236,15 @@ mod tests {
     fn test_save_and_load_config() {
         let temp_dir = tempdir().unwrap();
         let config_file = temp_dir.path().join("test_config.toml");
-        
+
         // Create and save config
         let mut original_config = Config::default();
         let test_dir = tempdir().unwrap();
-        original_config.add_path(test_dir.path().to_path_buf()).unwrap();
+        original_config
+            .add_path(test_dir.path().to_path_buf())
+            .unwrap();
         original_config.save(&config_file).unwrap();
-        
+
         // Load and verify config
         let content = fs::read_to_string(&config_file).unwrap();
         let loaded_config: Config = toml::from_str(&content).unwrap();

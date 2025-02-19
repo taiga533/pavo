@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use assert_cmd::prelude::*;
-    use std::process::Command;
     use predicates::prelude::*;
     use std::env;
+    use std::process::Command;
     use tempfile::TempDir;
 
     fn setup() -> TempDir {
@@ -42,14 +42,16 @@ mod tests {
             .arg("nonexistent_directory")
             .assert()
             .failure()
-            .stderr(predicate::str::contains("nonexistent_directory does not exist."));
+            .stderr(predicate::str::contains(
+                "nonexistent_directory does not exist.",
+            ));
     }
 
     // #[test]
     // fn test_start_fuzzy_find_command() -> Result<()> {
     //     let temp_dir = setup();
     //     Command::cargo_bin("pavo")?.arg("add").arg(temp_dir.path().to_str().unwrap()).assert().success();
-        
+
     //     let mut cmd = Command::cargo_bin("pavo")?;
     //     let mut child = spawn_command(cmd, Some(10000))?;
     //     child.exp_string(temp_dir.path().to_str().unwrap())?;
@@ -72,21 +74,23 @@ mod tests {
     #[test]
     fn test_config_command_fails_when_editor_not_set() {
         let _temp_dir = setup();
-        
+
         Command::cargo_bin("pavo")
             .unwrap()
             .env_remove("EDITOR")
             .arg("config")
             .assert()
             .failure()
-            .stderr(predicate::str::contains("EDITOR environment variable is not set"));
+            .stderr(predicate::str::contains(
+                "EDITOR environment variable is not set",
+            ));
     }
 
     #[test]
     fn test_config_command_succeeds_when_editor_is_set() {
         let _temp_dir = setup();
-        env::set_var("EDITOR", "echo");  // echoコマンドをエディタとして使用（テスト用）
-        
+        env::set_var("EDITOR", "echo"); // echoコマンドをエディタとして使用（テスト用）
+
         Command::cargo_bin("pavo")
             .unwrap()
             .arg("config")

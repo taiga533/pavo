@@ -1,10 +1,12 @@
+use crate::config::{Config, ConfigPath};
+use crate::entry::{
+    directory::DirectoryEntry, file::FileEntry, repository::RepositoryEntry, Entry,
+};
 use anyhow::{Context, Result};
+use git2::Repository;
+use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::borrow::Cow;
-use git2::Repository;
-use crate::entry::{directory::DirectoryEntry, file::FileEntry, repository::RepositoryEntry, Entry};
-use crate::config::{Config, ConfigPath};
 
 pub struct Pavo {
     config: Config,
@@ -13,11 +15,16 @@ pub struct Pavo {
 
 impl Pavo {
     pub fn new(config_dir: Option<PathBuf>) -> Result<Self> {
-        let config_dir = config_dir.or_else(dirs::config_dir).context("Could not find config directory")?;
+        let config_dir = config_dir
+            .or_else(dirs::config_dir)
+            .context("Could not find config directory")?;
         fs::create_dir_all(&config_dir)?;
         let config_file = config_dir.join("pavo.toml");
         let config = Config::new(Some(config_dir))?;
-        Ok(Self { config, config_file })
+        Ok(Self {
+            config,
+            config_file,
+        })
     }
 
     pub fn get_entry_preview(path: &Path) -> Result<Cow<'static, str>> {
@@ -73,10 +80,13 @@ impl Pavo {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::{BufReader, Read, Write}};
+    use std::{
+        fs::File,
+        io::{BufReader, Read, Write},
+    };
 
-    use crate::test_helper;
     use super::*;
+    use crate::test_helper;
 
     #[cfg(test)]
     fn setup() -> (Pavo, tempfile::TempDir) {
@@ -125,7 +135,9 @@ mod tests {
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(temp_dir.path());
         assert!(result.is_ok());
-        assert!(result.unwrap().contains(child_file.file_name().unwrap().to_str().unwrap()));
+        assert!(result
+            .unwrap()
+            .contains(child_file.file_name().unwrap().to_str().unwrap()));
     }
 
     #[test]
@@ -165,4 +177,3 @@ mod tests {
         assert!(lines.contains(temp_dir.path().to_str().unwrap()));
     }
 }
-

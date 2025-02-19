@@ -1,8 +1,8 @@
-use std::borrow::Cow;
-use std::path::PathBuf;
-use std::fs;
 use crate::entry::Entry;
 use colored::Colorize;
+use std::borrow::Cow;
+use std::fs;
+use std::path::PathBuf;
 
 pub struct DirectoryEntry {
     path: PathBuf,
@@ -12,14 +12,22 @@ pub struct DirectoryEntry {
 
 impl DirectoryEntry {
     pub fn new(path: PathBuf, max_entries: Option<usize>, max_depth: Option<usize>) -> Self {
-        Self { 
-            path, 
+        Self {
+            path,
             max_depth: max_depth.unwrap_or(1),
             max_entries: max_entries.unwrap_or(128),
         }
     }
 
-    fn build_tree(path: &PathBuf, prefix: &str, output: &mut String, current_depth: usize, max_depth: usize, max_entries: usize, entries_count: &mut usize) -> std::io::Result<bool> {
+    fn build_tree(
+        path: &PathBuf,
+        prefix: &str,
+        output: &mut String,
+        current_depth: usize,
+        max_depth: usize,
+        max_entries: usize,
+        entries_count: &mut usize,
+    ) -> std::io::Result<bool> {
         if current_depth > max_depth {
             return Ok(false);
         }
@@ -74,7 +82,15 @@ impl DirectoryEntry {
                 } else {
                     format!("{}{}", prefix, if is_last { "    " } else { "│   " })
                 };
-                if Self::build_tree(&entry.path(), &new_prefix, output, current_depth + 1, max_depth, max_entries, entries_count)? {
+                if Self::build_tree(
+                    &entry.path(),
+                    &new_prefix,
+                    output,
+                    current_depth + 1,
+                    max_depth,
+                    max_entries,
+                    entries_count,
+                )? {
                     break;
                 }
             }
@@ -84,11 +100,19 @@ impl DirectoryEntry {
 }
 
 impl Entry for DirectoryEntry {
-
     fn get_preview(&self) -> Cow<'static, str> {
         let mut preview = String::new();
         let mut entries_count = 0;
-        Self::build_tree(&self.path, "", &mut preview, 0, self.max_depth, self.max_entries, &mut entries_count).unwrap();
+        Self::build_tree(
+            &self.path,
+            "",
+            &mut preview,
+            0,
+            self.max_depth,
+            self.max_entries,
+            &mut entries_count,
+        )
+        .unwrap();
         preview.into()
     }
 }
@@ -105,7 +129,11 @@ mod tests {
         let nested_dir_path = dir_path.join("nested_dir");
         fs::create_dir_all(&nested_dir_path).unwrap();
         fs::write(dir_path.join("test_file.txt"), "Hello, world!").unwrap();
-        fs::write(nested_dir_path.join("nested_file.txt"), "Hello, nested world!").unwrap();
+        fs::write(
+            nested_dir_path.join("nested_file.txt"),
+            "Hello, nested world!",
+        )
+        .unwrap();
 
         let entry = DirectoryEntry::new(temp_dir.path().to_path_buf(), None, None);
         let preview = entry.get_preview();
@@ -121,7 +149,11 @@ mod tests {
         let nested_dir_path = dir_path.join("nested_dir");
         fs::create_dir_all(&nested_dir_path).unwrap();
         fs::write(dir_path.join("test_file.txt"), "Hello, world!").unwrap();
-        fs::write(nested_dir_path.join("nested_file.txt"), "Hello, nested world!").unwrap();
+        fs::write(
+            nested_dir_path.join("nested_file.txt"),
+            "Hello, nested world!",
+        )
+        .unwrap();
 
         let entry = DirectoryEntry::new(temp_dir.path().to_path_buf(), None, Some(2));
         let preview = entry.get_preview();
@@ -135,7 +167,7 @@ mod tests {
         colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
-        
+
         // Create a directory structure:
         // root
         // ├── dir1
@@ -163,7 +195,7 @@ mod tests {
     fn test_should_exclude_dot_files() {
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
-        
+
         fs::write(root_path.join(".hidden_file"), "").unwrap();
         fs::create_dir(root_path.join(".hidden_dir")).unwrap();
         fs::write(root_path.join("visible_file.txt"), "").unwrap();
@@ -171,7 +203,7 @@ mod tests {
 
         let entry = DirectoryEntry::new(root_path.to_path_buf(), None, None);
         let preview = entry.get_preview();
-        
+
         assert!(preview.contains("visible_file.txt"));
         assert!(preview.contains("visible_dir"));
         assert!(!preview.contains(".hidden_file"));
@@ -182,7 +214,7 @@ mod tests {
     fn test_should_limit_entries() {
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
-        
+
         // Create more files than the limit
         for i in 0..10 {
             fs::write(root_path.join(format!("file{}.txt", i)), "").unwrap();
@@ -191,7 +223,7 @@ mod tests {
         // Set max_entries to 5
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(5), None);
         let preview = entry.get_preview();
-        
+
         // Should only show 5 entries plus the "..." indicator
         let lines: Vec<_> = preview.lines().collect();
         assert_eq!(lines.len(), 6); // 5 files + "..."
@@ -205,11 +237,11 @@ mod tests {
         colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
-        
+
         // Create a nested directory structure with many files
         let dir1_path = root_path.join("dir1");
         fs::create_dir_all(&dir1_path).unwrap();
-        
+
         for i in 0..5 {
             fs::write(dir1_path.join(format!("file{}.txt", i)), "").unwrap();
         }
@@ -220,11 +252,11 @@ mod tests {
         //     ├── file2.txt
         //     ├── file3.txt
         //     └── file4.txt
-        
+
         // Set max_entries to 3 and depth to 2
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(3), Some(2));
         let preview = entry.get_preview();
-        
+
         // Should show limited entries and "..." in the nested structure
         assert!(preview.contains("dir1"));
         assert!(preview.contains("file0.txt"));
@@ -237,7 +269,7 @@ mod tests {
         colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
-        
+
         // Create multiple directories with files
         // root
         // ├── dir1
@@ -262,7 +294,7 @@ mod tests {
         // Test with max_entries = 4 (should show partial structure)
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(4), Some(2));
         let preview = entry.get_preview();
-        
+
         // Should show:
         // dir1
         // ├── file1.txt
@@ -280,7 +312,9 @@ mod tests {
 
         // Verify the tree structure is maintained
         let lines: Vec<_> = preview.lines().collect();
-        assert!(lines.iter().any(|line| line.contains("├──") || line.contains("└──")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("├──") || line.contains("└──")));
     }
 
     #[test]
@@ -288,7 +322,7 @@ mod tests {
         colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
-        
+
         // Create a deep nested structure:
         // root
         // ├── dir1
