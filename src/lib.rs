@@ -34,7 +34,13 @@ pub fn run() -> anyhow::Result<()> {
                 .with_context(|| "Failed to wait for editor to close")?;
             Ok(())
         },
-        Some(cli::Commands::Clean) => pavo.remove_nonexistent_paths(),
-        None => skim_proxy::call_skim(&pavo),
+        Some(cli::Commands::Clean) => {
+            pavo.clean()?;
+            Ok(())
+        },
+        None => {
+            pavo.clean()?;
+            skim_proxy::call_skim(&mut pavo)
+        }
     }
 }

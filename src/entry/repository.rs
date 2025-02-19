@@ -14,14 +14,14 @@ pub struct RepositoryEntry {
 pub fn format_latest_commit(commit: &git2::Commit) -> Cow<'static, str> {
     let mut lines = String::new();
     lines.push_str(&format!("\n📌 {}\n", "Latest Commit:".yellow()));
-    lines.push_str(&format!("commit {}\n", commit.id().to_string()));
+    lines.push_str(&format!("commit {}\n", commit.id()));
     lines.push_str(&format!("Author: {}\n", commit.author()));
     if let Some(msg) = commit.message() {
         if let Some(first_line) = msg.lines().next() {
             lines.push_str(&format!("\n    {}\n", first_line.bold()));
         }
     }
-    lines.push_str("\n");
+    lines.push('\n');
     lines.into()
 }
 

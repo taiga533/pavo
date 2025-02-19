@@ -32,13 +32,13 @@ impl Entry for FileEntry {
         let mut writer = String::new();
         printer
             .input_file(&self.path)
-            .line_ranges(LineRanges::from(vec![LineRange::new(1, self.display_lines as usize)]))
+            .line_ranges(LineRanges::from(vec![LineRange::new(1, self.display_lines)]))
             .print_with_writer(Some(&mut writer)).unwrap();
 
         // ファイルの行数をカウント
         if let Ok(content) = read_to_string(&self.path) {
             let line_count = content.lines().count();
-            if line_count > self.display_lines as usize {
+            if line_count > self.display_lines {
                 writer.push_str("\n...and more");
             }
         }

@@ -1,5 +1,4 @@
 use skim::prelude::*;
-use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -22,27 +21,30 @@ impl SkimItem for ItemStruct {
     }
 }
 
-pub fn call_skim(pavo: &Pavo) -> Result<()> {
+pub fn call_skim(pavo: &mut Pavo) -> Result<()> {
     let options = SkimOptionsBuilder::default()
         .height("100%".to_string())
-        .multi(true)
+        .multi(false)
+        .filter(Some("a".to_string()))
         .preview_fn(Some(PreviewCallback::from(|items: Vec<Arc<dyn SkimItem>>| {
-            items.iter().map(|item| {
+            items.iter().flat_map(|item| {
                 let path = PathBuf::from_str(item.text().as_ref()).unwrap();
                 let preview = Pavo::get_entry_preview(&path).unwrap();
                 preview.split("\n").map(|line| {
                     AnsiString::parse(line)
                 }).collect::<Vec<_>>()
-            }).flatten().collect::<Vec<_>>()
+            }).collect::<Vec<_>>()
         })))
         .bind(vec!["ctrl-/:toggle-preview".to_string(), "?:toggle-preview".to_string()])
         .color(Some("fg:252,bg:234,preview-fg:252,preview-bg:234".to_string()))
         .build()
         .unwrap();
     
-    let items: Vec<ItemStruct> = fs::read_to_string(&pavo.get_config_file())?
-        .lines()
-        .map(|line| ItemStruct { text: line.to_string() })
+    
+    let items: Vec<ItemStruct> = pavo.get_paths().iter()
+        .map(|config_path| ItemStruct { 
+            text: config_path.path.display().to_string()
+         })
         .collect();
     
     let item_reader = SkimItemReader::default();
@@ -57,12 +59,14 @@ pub fn call_skim(pavo: &Pavo) -> Result<()> {
         .map(|out| {
             out.selected_items
                 .first()
-                .and_then(|item| Some(item.output().to_string()))
+                .map(|item| item.output().to_string())
         })
         .unwrap_or(None);
 
     if let Some(path) = selected_item {
-        println!("cd {}", path);
+        let path = PathBuf::from(path);
+        pavo.update_last_selected(&path)?;
+        println!("{}", path.display());
     }
     Ok(())
 }

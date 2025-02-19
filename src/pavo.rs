@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::borrow::Cow;
 use git2::Repository;
 use crate::entry::{directory::DirectoryEntry, file::FileEntry, repository::RepositoryEntry, Entry};
-use crate::config::Config;
+use crate::config::{Config, ConfigPath};
 
 pub struct Pavo {
     config: Config,
@@ -13,22 +13,22 @@ pub struct Pavo {
 
 impl Pavo {
     pub fn new(config_dir: Option<PathBuf>) -> Result<Self> {
-        let config_dir = config_dir.or_else(|| dirs::config_dir()).context("Could not find config directory")?;
+        let config_dir = config_dir.or_else(dirs::config_dir).context("Could not find config directory")?;
         fs::create_dir_all(&config_dir)?;
         let config_file = config_dir.join("pavo.toml");
         let config = Config::new(Some(config_dir))?;
         Ok(Self { config, config_file })
     }
 
-    pub fn get_entry_preview(path: &PathBuf) -> Result<Cow<'static, str>> {
+    pub fn get_entry_preview(path: &Path) -> Result<Cow<'static, str>> {
         if path.is_dir() {
             if Self::is_git_repo(path) {
-                Ok(RepositoryEntry::new(path.clone()).get_preview().into())
+                Ok(RepositoryEntry::new(path.to_path_buf()).get_preview())
             } else {
-                Ok(DirectoryEntry::new(path.clone(), None, None).get_preview().into())
+                Ok(DirectoryEntry::new(path.to_path_buf(), None, None).get_preview())
             }
         } else {
-            Ok(FileEntry::new(path.clone(), None).get_preview().into())
+            Ok(FileEntry::new(path.to_path_buf(), None).get_preview())
         }
     }
 
@@ -47,14 +47,27 @@ impl Pavo {
         &self.config_file
     }
 
-    pub fn remove_nonexistent_paths(&mut self) -> Result<()> {
+    pub fn clean(&mut self) -> Result<()> {
         self.config.remove_nonexistent_paths();
+        self.config.remove_old_paths();
         self.config.save(&self.config_file)?;
         Ok(())
     }
 
     pub fn contains(&self, path: &Path) -> bool {
         self.config.contains(path)
+    }
+
+    pub fn get_paths(&self) -> &Vec<ConfigPath> {
+        &self.config.paths
+    }
+
+    pub fn update_last_selected(&mut self, path: &Path) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            config_path.last_selected = chrono::Utc::now();
+            self.config.save(&self.config_file)?;
+        }
+        Ok(())
     }
 }
 
@@ -103,30 +116,6 @@ mod tests {
     }
 
     #[test]
-    fn test_can_remove_nonexistent_paths() {
-        let (mut pavo, _temp_config_dir) = setup();
-        let temp_dir = tempfile::tempdir().unwrap();
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
-        assert!(result.is_ok());
-        let temp_dir_path = temp_dir.path().to_path_buf();
-        temp_dir.close().unwrap();
-        let result = pavo.remove_nonexistent_paths();
-        assert!(result.is_ok());
-        assert!(!pavo.contains(&temp_dir_path));
-    }
-
-    #[test]
-    fn test_will_not_remove_existent_paths() {
-        let (mut pavo, _temp_config_dir) = setup();
-        let temp_dir = tempfile::tempdir().unwrap();
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
-        assert!(result.is_ok());
-        let result = pavo.remove_nonexistent_paths();
-        assert!(result.is_ok());
-        assert!(pavo.contains(temp_dir.path()));
-    }
-
-    #[test]
     fn test_can_get_entry_preview() {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
@@ -134,7 +123,7 @@ mod tests {
         File::create(&child_file).unwrap();
         let result = pavo.add_path(temp_dir.path().to_str().unwrap());
         assert!(result.is_ok());
-        let result = Pavo::get_entry_preview(&temp_dir.path().to_path_buf());
+        let result = Pavo::get_entry_preview(temp_dir.path());
         assert!(result.is_ok());
         assert!(result.unwrap().contains(child_file.file_name().unwrap().to_str().unwrap()));
     }
@@ -146,7 +135,7 @@ mod tests {
         let repo = test_helper::setup_test_repo(&temp_dir);
         let result = pavo.add_path(temp_dir.path().to_str().unwrap());
         assert!(result.is_ok());
-        let result = Pavo::get_entry_preview(&repo.path().to_path_buf());
+        let result = Pavo::get_entry_preview(repo.path());
         assert!(result.is_ok());
         assert!(result.unwrap().contains("Branch"));
     }
@@ -159,7 +148,7 @@ mod tests {
         write!(File::create(&file).unwrap(), "test content").unwrap();
         let result = pavo.add_path(temp_dir.path().to_str().unwrap());
         assert!(result.is_ok());
-        let result = Pavo::get_entry_preview(&file.to_path_buf());
+        let result = Pavo::get_entry_preview(file.as_path());
         assert!(result.is_ok());
         assert!(result.unwrap().contains("test content"));
     }

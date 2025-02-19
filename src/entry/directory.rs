@@ -46,11 +46,9 @@ impl DirectoryEntry {
         entries.sort_by_key(|entry| entry.path());
 
         for (i, entry) in entries.iter().enumerate() {
-            if *entries_count >= max_entries {
-                if i < entries.len() {
-                    output.push_str(&format!("{}└── ...\n", prefix));
-                    return Ok(true);
-                }
+            if *entries_count >= max_entries && i < entries.len() {
+                output.push_str(&format!("{}└── ...\n", prefix));
+                return Ok(true);
             }
 
             let is_last = i == entries.len() - 1;
