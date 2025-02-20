@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,7 +30,7 @@ impl Default for Config {
         Self {
             paths: Vec::new(),
             auto_clean: true,
-            max_unselected_time: 60 * 60 * 24,
+            max_unselected_time: Duration::days(7).num_seconds() as u64,
         }
     }
 }
@@ -115,7 +116,10 @@ mod tests {
         let config = Config::default();
         assert!(config.paths.is_empty());
         assert!(config.auto_clean);
-        assert_eq!(config.max_unselected_time, 60 * 60 * 24);
+        assert_eq!(
+            config.max_unselected_time,
+            Duration::days(7).num_seconds() as u64
+        );
     }
 
     #[test]
