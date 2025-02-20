@@ -17,9 +17,9 @@ pub fn run() -> anyhow::Result<()> {
         .ok();
     let mut pavo = Pavo::new(config_dir)?;
     match cli::Cli::parse().command {
-        Some(cli::Commands::Add { dir }) => match dir {
-            Some(d) => pavo.add_path(&d),
-            None => pavo.add_path(std::env::current_dir()?.to_str().unwrap()),
+        Some(cli::Commands::Add { dir, persist }) => match dir {
+            Some(d) => pavo.add_path(&d, persist),
+            None => pavo.add_path(std::env::current_dir()?.to_str().unwrap(), persist),
         },
         Some(cli::Commands::Config) => {
             let config_file = pavo.get_config_file();

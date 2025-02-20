@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,7 +30,7 @@ impl Default for Config {
         Self {
             paths: Vec::new(),
             auto_clean: true,
-            max_unselected_time: 60 * 60 * 24,
+            max_unselected_time: Duration::days(7).num_seconds() as u64,
         }
     }
 }
@@ -59,7 +60,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn add_path(&mut self, path: PathBuf) -> Result<()> {
+    pub fn add_path(&mut self, path: PathBuf, persist: bool) -> Result<()> {
         if !path.exists() {
             anyhow::bail!("{} does not exist.", path.display());
         }
@@ -71,7 +72,7 @@ impl Config {
         self.paths.push(ConfigPath {
             path,
             last_selected: chrono::Utc::now(),
-            persist: false,
+            persist,
         });
         Ok(())
     }
@@ -115,7 +116,10 @@ mod tests {
         let config = Config::default();
         assert!(config.paths.is_empty());
         assert!(config.auto_clean);
-        assert_eq!(config.max_unselected_time, 60 * 60 * 24);
+        assert_eq!(
+            config.max_unselected_time,
+            Duration::days(7).num_seconds() as u64
+        );
     }
 
     #[test]
@@ -129,7 +133,7 @@ mod tests {
     #[test]
     fn test_add_path_should_fail_for_nonexistent_path() {
         let mut config = Config::default();
-        let result = config.add_path(PathBuf::from("nonexistent_path"));
+        let result = config.add_path(PathBuf::from("nonexistent_path"), false);
         assert!(result.is_err());
     }
 
@@ -137,8 +141,10 @@ mod tests {
     fn test_add_path_should_fail_for_duplicate_path() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default();
-        config.add_path(temp_dir.path().to_path_buf()).unwrap();
-        let result = config.add_path(temp_dir.path().to_path_buf());
+        config
+            .add_path(temp_dir.path().to_path_buf(), false)
+            .unwrap();
+        let result = config.add_path(temp_dir.path().to_path_buf(), false);
         assert!(result.is_err());
     }
 
@@ -146,7 +152,7 @@ mod tests {
     fn test_add_path_should_succeed_for_valid_path() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default();
-        let result = config.add_path(temp_dir.path().to_path_buf());
+        let result = config.add_path(temp_dir.path().to_path_buf(), false);
         assert!(result.is_ok());
         assert_eq!(config.paths.len(), 1);
     }
@@ -157,11 +163,15 @@ mod tests {
         let mut config = Config::default();
 
         // Add existing path
-        config.add_path(temp_dir.path().to_path_buf()).unwrap();
+        config
+            .add_path(temp_dir.path().to_path_buf(), false)
+            .unwrap();
 
         // Add path that will be deleted
         let deleted_dir = tempdir().unwrap();
-        config.add_path(deleted_dir.path().to_path_buf()).unwrap();
+        config
+            .add_path(deleted_dir.path().to_path_buf(), false)
+            .unwrap();
 
         // Delete the directory
         fs::remove_dir_all(deleted_dir.path()).unwrap();
@@ -177,7 +187,9 @@ mod tests {
         let mut config = Config::default();
 
         // Add path that will be deleted but persisted
-        config.add_path(deleted_dir.path().to_path_buf()).unwrap();
+        config
+            .add_path(deleted_dir.path().to_path_buf(), true)
+            .unwrap();
         config.paths[0].persist = true;
 
         // Delete the directory
@@ -193,7 +205,9 @@ mod tests {
         let mut config = Config::default();
 
         // Add path with old timestamp
-        config.add_path(temp_dir.path().to_path_buf()).unwrap();
+        config
+            .add_path(temp_dir.path().to_path_buf(), false)
+            .unwrap();
         let old_time =
             chrono::Utc::now() - Duration::seconds((config.max_unselected_time + 1) as i64);
         config.paths[0].last_selected = old_time;
@@ -208,7 +222,9 @@ mod tests {
         let mut config = Config::default();
 
         // Add path with old timestamp but persisted
-        config.add_path(temp_dir.path().to_path_buf()).unwrap();
+        config
+            .add_path(temp_dir.path().to_path_buf(), true)
+            .unwrap();
         let old_time =
             chrono::Utc::now() - Duration::seconds((config.max_unselected_time + 1) as i64);
         config.paths[0].last_selected = old_time;
@@ -222,7 +238,9 @@ mod tests {
     fn test_contains_should_return_true_for_existing_path() {
         let temp_dir = tempdir().unwrap();
         let mut config = Config::default();
-        config.add_path(temp_dir.path().to_path_buf()).unwrap();
+        config
+            .add_path(temp_dir.path().to_path_buf(), false)
+            .unwrap();
         assert!(config.contains(temp_dir.path()));
     }
 
@@ -241,7 +259,7 @@ mod tests {
         let mut original_config = Config::default();
         let test_dir = tempdir().unwrap();
         original_config
-            .add_path(test_dir.path().to_path_buf())
+            .add_path(test_dir.path().to_path_buf(), false)
             .unwrap();
         original_config.save(&config_file).unwrap();
 
