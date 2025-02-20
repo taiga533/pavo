@@ -15,6 +15,9 @@ pub enum Commands {
     Add {
         #[arg(name = "DIR")]
         dir: Option<String>,
+        /// Persist the directory in the configuration file
+        #[arg(short, long)]
+        persist: bool,
     },
     /// Remove a non-existent repository from the configuration file
     Clean,
@@ -31,8 +34,9 @@ mod tests {
     fn test_cli_add_with_dir() {
         let cli = Cli::try_parse_from(&["pavo", "add", "/path/to/entry"]).unwrap();
         match cli.command {
-            Some(Commands::Add { dir }) => {
+            Some(Commands::Add { dir, persist }) => {
                 assert_eq!(dir, Some("/path/to/entry".to_string()));
+                assert!(!persist);
             }
             _ => panic!("Expected Add command"),
         }
@@ -43,8 +47,21 @@ mod tests {
         let cli = Cli::try_parse_from(&["pavo", "add"]).unwrap();
         assert!(cli.command.is_some());
         match cli.command {
-            Some(Commands::Add { dir }) => {
+            Some(Commands::Add { dir, persist }) => {
                 assert_eq!(dir, None);
+                assert!(!persist);
+            }
+            _ => panic!("Expected Add command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_add_with_persist() {
+        let cli = Cli::try_parse_from(&["pavo", "add", "/path/to/entry", "--persist"]).unwrap();
+        match cli.command {
+            Some(Commands::Add { dir, persist }) => {
+                assert_eq!(dir, Some("/path/to/entry".to_string()));
+                assert!(persist);
             }
             _ => panic!("Expected Add command"),
         }

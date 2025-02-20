@@ -43,7 +43,7 @@ impl Pavo {
         Repository::open(dir).is_ok()
     }
 
-    pub fn add_path(&mut self, path: &str) -> Result<()> {
+    pub fn add_path(&mut self, path: &str, persist: bool) -> Result<()> {
         let path = PathBuf::from(path);
         let absolute_path = if path.is_absolute() {
             path
@@ -51,7 +51,7 @@ impl Pavo {
             std::env::current_dir()?.join(path)
         };
         let canonical_path = absolute_path.canonicalize()?;
-        self.config.add_path(canonical_path)?;
+        self.config.add_path(canonical_path, persist)?;
         self.config.save(&self.config_file)?;
         Ok(())
     }
@@ -107,14 +107,14 @@ mod tests {
     fn test_can_add_existing_path() {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
+        let result = pavo.add_path(temp_dir.path().to_str().unwrap(), false);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_cant_add_nonexistent_path() {
         let (mut pavo, _temp_config_dir) = setup();
-        let result = pavo.add_path("nonexistent_path");
+        let result = pavo.add_path("nonexistent_path", false);
         assert!(result.is_err());
     }
 
@@ -128,7 +128,7 @@ mod tests {
     fn test_can_detect_existent_path() -> Result<()> {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
+        let result = pavo.add_path(temp_dir.path().to_str().unwrap(), false);
         assert!(result.is_ok());
         assert!(pavo.contains(temp_dir.path().canonicalize()?.as_path()));
 
@@ -141,7 +141,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let child_file = temp_dir.path().join("child_file.txt");
         File::create(&child_file).unwrap();
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
+        let result = pavo.add_path(temp_dir.path().to_str().unwrap(), false);
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(temp_dir.path());
         assert!(result.is_ok());
@@ -155,7 +155,7 @@ mod tests {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
         let repo = test_helper::setup_test_repo(&temp_dir);
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
+        let result = pavo.add_path(temp_dir.path().to_str().unwrap(), false);
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(repo.path());
         assert!(result.is_ok());
@@ -168,7 +168,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let file = temp_dir.path().join("file.txt");
         write!(File::create(&file).unwrap(), "test content").unwrap();
-        let result = pavo.add_path(temp_dir.path().to_str().unwrap());
+        let result = pavo.add_path(temp_dir.path().to_str().unwrap(), false);
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(file.as_path());
         assert!(result.is_ok());
@@ -179,7 +179,8 @@ mod tests {
     fn test_can_get_config_file() {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
-        pavo.add_path(temp_dir.path().to_str().unwrap()).unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
         let result = pavo.get_config_file();
         let result = File::open(result).unwrap();
         let mut lines = String::new();
@@ -197,7 +198,7 @@ mod tests {
 
         std::fs::create_dir("test_dir").unwrap();
 
-        let result = pavo.add_path("test_dir");
+        let result = pavo.add_path("test_dir", false);
 
         std::env::set_current_dir(original_dir).unwrap();
 
