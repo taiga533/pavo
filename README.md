@@ -1,41 +1,30 @@
-# 🦗Repos Hopper
-gitのリポジトリを楽に移動するためのツール。
+# Pavo
 
-**動作させるにはfzfのインストールが必要です。**
-```
-apt install fzf
-```
+[![codecov](https://codecov.io/gh/taiga533/pavo/branch/main/graph/badge.svg)](https://codecov.io/gh/taiga533/pavo) [![Rust](https://github.com/taiga533/pavo/actions/workflows/rust.yml/badge.svg)]
+pavo(from favorite + path) is a tool to help you find the file and directory you want to edit.
 
-## インストール・更新方法
+## Installation
+
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/taiga533/repos-hopper/main/install.sh)"
+curl -L https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /usr/local/bin
 ```
 
-## 使用方法
-### 1. ツールにgitローカルリポジトリを登録する
+## Usage
+
 ```bash
-cd [リポジトリへのpath]
-rh add
+pavo add <path>
+# or
+pavo add
 ```
 
-### 2. 登録したディレクトリを選択して移動
 ```bash
-rh
+pavo remove <path>
 ```
 
-### 存在しなくなったリポジトリをリポジトリ一覧から削除
 ```bash
-rh clean
+pavo list
 ```
 
-### 登録されたリポジトリ一覧と各リポジトリの最新コミットを表示
 ```bash
-rh list
-```
-
-### help
-```bash
-rh --help
-# もしくは
-rh -h
+pavo edit <path>
 ```
