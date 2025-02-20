@@ -42,9 +42,7 @@ mod tests {
             .arg("nonexistent_directory")
             .assert()
             .failure()
-            .stderr(predicate::str::contains(
-                "nonexistent_directory does not exist.",
-            ));
+            .stderr(predicate::str::contains("Error: No such file or directory"));
     }
 
     // #[test]
