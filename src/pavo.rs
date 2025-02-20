@@ -191,16 +191,16 @@ mod tests {
     fn test_can_add_relative_path() {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
-        
+
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(temp_dir.path()).unwrap();
-        
+
         std::fs::create_dir("test_dir").unwrap();
-        
+
         let result = pavo.add_path("test_dir");
-        
+
         std::env::set_current_dir(original_dir).unwrap();
-        
+
         assert!(result.is_ok());
         assert!(pavo.contains(&temp_dir.path().join("test_dir").canonicalize().unwrap()));
     }
