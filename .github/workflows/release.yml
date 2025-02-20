@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   create-release:
@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          tar czvf ../../../path-hopper-${{ matrix.name }}.tar.gz path-hopper
+          tar czvf ../../../pavo-${{ matrix.name }}.tar.gz pavo
           cd -
 
       - name: Upload Release Asset
@@ -63,8 +63,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./path-hopper-${{ matrix.name }}.tar.gz
-          asset_name: path-hopper-${{ matrix.name }}.tar.gz
+          asset_path: ./pavo-${{ matrix.name }}.tar.gz
+          asset_name: pavo-${{ matrix.name }}.tar.gz
           asset_content_type: application/gzip
 
   # update-homebrew:
@@ -74,9 +74,9 @@ jobs:
   #     - name: Update Homebrew formula
   #       uses: mislav/bump-homebrew-formula-action@v3
   #       with:
-  #         formula-name: path-hopper
+  #         formula-name: pavo
   #         homebrew-tap: taiga/homebrew-tap
   #         base-branch: main
-  #         download-url: https://github.com/taiga/path-hopper/releases/download/${{ github.ref_name }}/path-hopper-darwin-arm64.tar.gz
+  #         download-url: https://github.com/taiga/pavo/releases/download/${{ github.ref_name }}/pavo-darwin-arm64.tar.gz
   #       env:
-  #         COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }} 
+  #         COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
