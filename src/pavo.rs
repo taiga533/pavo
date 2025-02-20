@@ -45,7 +45,13 @@ impl Pavo {
 
     pub fn add_path(&mut self, path: &str) -> Result<()> {
         let path = PathBuf::from(path);
-        self.config.add_path(path)?;
+        let absolute_path = if path.is_absolute() {
+            path
+        } else {
+            std::env::current_dir()?.join(path)
+        };
+        let canonical_path = absolute_path.canonicalize()?;
+        self.config.add_path(canonical_path)?;
         self.config.save(&self.config_file)?;
         Ok(())
     }
@@ -62,6 +68,8 @@ impl Pavo {
     }
 
     pub fn contains(&self, path: &Path) -> bool {
+        println!("path: {}", path.display());
+        println!("config: {:?}", self.config.paths);
         self.config.contains(path)
     }
 
@@ -117,12 +125,14 @@ mod tests {
     }
 
     #[test]
-    fn test_can_detect_existent_path() {
+    fn test_can_detect_existent_path() -> Result<()> {
         let (mut pavo, _temp_config_dir) = setup();
         let temp_dir = tempfile::tempdir().unwrap();
         let result = pavo.add_path(temp_dir.path().to_str().unwrap());
         assert!(result.is_ok());
-        assert!(pavo.contains(temp_dir.path()));
+        assert!(pavo.contains(temp_dir.path().canonicalize()?.as_path()));
+
+        Ok(())
     }
 
     #[test]
@@ -175,5 +185,23 @@ mod tests {
         let mut lines = String::new();
         BufReader::new(result).read_to_string(&mut lines).unwrap();
         assert!(lines.contains(temp_dir.path().to_str().unwrap()));
+    }
+
+    #[test]
+    fn test_can_add_relative_path() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+        
+        std::fs::create_dir("test_dir").unwrap();
+        
+        let result = pavo.add_path("test_dir");
+        
+        std::env::set_current_dir(original_dir).unwrap();
+        
+        assert!(result.is_ok());
+        assert!(pavo.contains(&temp_dir.path().join("test_dir").canonicalize().unwrap()));
     }
 }
