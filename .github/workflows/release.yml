@@ -23,6 +23,8 @@ jobs:
           args: -vv --latest --no-exec --github-repo ${{ github.repository }}
 
   build-release:
+    permissions:
+      contents: write
     needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,14 +52,14 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          tar czvf ../../../pavo-${{ matrix.name }}-${{ github.ref_name }}.tar.gz pavo
+          tar czvf ../../../pavo-${{ github.ref_name }}-${{ matrix.target }}.tar.gz pavo
           cd -
 
       - name: Publish to GitHub
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: pavo-${{ matrix.name }}-${{ github.ref_name }}.tar.gz
+          file: pavo-${{ github.ref_name }}-*.tar.gz
           file_glob: true
           overwrite: true
           tag: ${{ github.ref }}
