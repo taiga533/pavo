@@ -10,14 +10,16 @@ pavo(from favorite + path) is a tool to bookmark and easily reference files and 
 ### Linux
 
 ```bash
-curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz" \
+VERSION='v0.1.1'
+curl -L "https://github.com/taiga533/pavo/releases/download/${VERSION}/pavo-x86_64-unknown-linux-gnu.tar.gz" \
 | tar xz -C /usr/local/bin
 ```
 
 ### MacOS (Apple Silicon only)
 
 ```bash
-curl -v "https://github.com/taiga533/pavo/releases/latest/download/pavo-aarch64-apple-darwin.tar.gz" \
+VERSION='v0.1.1'
+curl -L "https://github.com/taiga533/pavo/releases/download/${VERSION}/pavo-aarch64-apple-darwin.tar.gz" \
 | tar xz -C /usr/local/bin
 ```
 
