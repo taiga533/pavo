@@ -5,8 +5,16 @@ pavo(from favorite + path) is a tool to help you find the file and directory you
 
 ## Installation
 
+### Linux
+
 ```bash
-curl -L https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /usr/local/bin
+curl -L https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu-v0.1.0.tar.gz | tar xz -C /usr/local/bin
+```
+
+### MacOS(Only Apple Silicon)
+
+```bash
+curl -L https://github.com/taiga533/pavo/releases/latest/download/pavo-aarch64-apple-darwin-v0.1.0.tar.gz | tar xz -C /usr/local/bin
 ```
 
 ## Usage
