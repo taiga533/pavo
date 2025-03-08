@@ -62,8 +62,8 @@ jobs:
           file: pavo-${{ matrix.target }}.tar.gz
           file_glob: true
           overwrite: true
-          tag: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
           body: "${{ needs.create-release.outputs.body }}"
 
   # update-homebrew:
