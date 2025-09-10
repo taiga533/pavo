@@ -7,7 +7,7 @@ pub mod cli;
 pub mod config;
 pub mod entry;
 pub mod pavo;
-pub mod skim_proxy;
+pub mod ratatui_ui;
 #[cfg(test)]
 pub mod test_helper;
 
@@ -39,7 +39,7 @@ pub fn run() -> anyhow::Result<()> {
         }
         None => {
             pavo.clean()?;
-            skim_proxy::call_skim(&mut pavo)
+            ratatui_ui::call_ui(&mut pavo)
         }
     }
 }
