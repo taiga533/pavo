@@ -1,0 +1,530 @@
+use anyhow::{Context, Result};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame, Terminal,
+};
+use std::borrow::Cow;
+use std::io;
+use std::path::PathBuf;
+
+use crate::Pavo;
+
+/// TUIアプリケーションの状態を管理する構造体
+pub struct App {
+    /// パスのリスト
+    paths: Vec<PathBuf>,
+    /// フィルタリング後のパスのインデックス
+    filtered_indices: Vec<usize>,
+    /// 選択中のアイテムのインデックス
+    selected: usize,
+    /// 入力中のクエリ
+    input: String,
+    /// ファジーマッチャー
+    matcher: SkimMatcherV2,
+    /// アプリケーションを終了するかどうか
+    should_quit: bool,
+    /// 選択されたパス
+    selected_path: Option<PathBuf>,
+    /// プレビューテキスト
+    preview: Cow<'static, str>,
+    /// プレビューのスクロールオフセット
+    preview_scroll: u16,
+}
+
+impl App {
+    /// 新しいAppインスタンスを作成する
+    ///
+    /// # Arguments
+    /// * `paths` - パスのリスト
+    pub fn new(paths: Vec<PathBuf>) -> Self {
+        let filtered_indices: Vec<usize> = (0..paths.len()).collect();
+        let preview = if !paths.is_empty() {
+            let preview_raw = Pavo::get_entry_preview(&paths[0]).unwrap_or_default();
+            // ANSIエスケープシーケンスを除去
+            let preview_clean = strip_ansi_escapes::strip_str(preview_raw.as_ref());
+            Cow::Owned(preview_clean)
+        } else {
+            Cow::Borrowed("")
+        };
+
+        Self {
+            paths,
+            filtered_indices,
+            selected: 0,
+            input: String::new(),
+            matcher: SkimMatcherV2::default(),
+            should_quit: false,
+            selected_path: None,
+            preview,
+            preview_scroll: 0,
+        }
+    }
+
+    /// 入力クエリに基づいてパスをフィルタリングする
+    fn filter_paths(&mut self) {
+        if self.input.is_empty() {
+            self.filtered_indices = (0..self.paths.len()).collect();
+        } else {
+            self.filtered_indices = self
+                .paths
+                .iter()
+                .enumerate()
+                .filter_map(|(i, path)| {
+                    let path_str = path.display().to_string();
+                    self.matcher
+                        .fuzzy_match(&path_str, &self.input)
+                        .map(|score| (i, score))
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|(i, _)| i)
+                .collect();
+        }
+        self.selected = 0;
+        self.update_preview();
+    }
+
+    /// プレビューを更新する
+    fn update_preview(&mut self) {
+        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+            let preview_raw = Pavo::get_entry_preview(&self.paths[idx]).unwrap_or_default();
+            // ANSIエスケープシーケンスを除去
+            let preview_clean = strip_ansi_escapes::strip_str(preview_raw.as_ref());
+            self.preview = Cow::Owned(preview_clean);
+        } else {
+            self.preview = Cow::Borrowed("");
+        }
+        self.preview_scroll = 0;
+    }
+
+    /// 次のアイテムを選択する
+    fn select_next(&mut self) {
+        if !self.filtered_indices.is_empty() {
+            self.selected = (self.selected + 1) % self.filtered_indices.len();
+            self.update_preview();
+        }
+    }
+
+    /// 前のアイテムを選択する
+    fn select_previous(&mut self) {
+        if !self.filtered_indices.is_empty() {
+            if self.selected == 0 {
+                self.selected = self.filtered_indices.len() - 1;
+            } else {
+                self.selected -= 1;
+            }
+            self.update_preview();
+        }
+    }
+
+    /// 現在選択中のパスを確定する
+    fn confirm_selection(&mut self) {
+        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+            self.selected_path = Some(self.paths[idx].clone());
+            self.should_quit = true;
+        }
+    }
+
+    /// 入力に文字を追加する
+    fn add_char(&mut self, c: char) {
+        self.input.push(c);
+        self.filter_paths();
+    }
+
+    /// 入力から最後の文字を削除する
+    fn delete_char(&mut self) {
+        self.input.pop();
+        self.filter_paths();
+    }
+
+    /// アプリケーションを終了する
+    fn quit(&mut self) {
+        self.should_quit = true;
+    }
+}
+
+/// TUIのイベントハンドリング
+///
+/// # Arguments
+/// * `app` - アプリケーションの状態
+fn handle_event(app: &mut App) -> Result<()> {
+    if event::poll(std::time::Duration::from_millis(100))? {
+        if let Event::Key(key) = event::read()? {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('c'), KeyModifiers::CONTROL) | (KeyCode::Esc, _) => {
+                    app.quit();
+                }
+                (KeyCode::Enter, _) => {
+                    app.confirm_selection();
+                }
+                (KeyCode::Down, _) | (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
+                    app.select_next();
+                }
+                (KeyCode::Up, _) | (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
+                    app.select_previous();
+                }
+                (KeyCode::Backspace, _) => {
+                    app.delete_char();
+                }
+                (KeyCode::Char(c), _) => {
+                    app.add_char(c);
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+/// UIを描画する
+///
+/// # Arguments
+/// * `f` - フレーム
+/// * `app` - アプリケーションの状態
+fn ui(f: &mut Frame, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(3)])
+        .split(f.area());
+
+    let top_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(chunks[0]);
+
+    // プレビューエリア (左)
+    let preview_block = Block::default()
+        .title("Preview")
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White));
+
+    let preview_text = Paragraph::new(app.preview.as_ref())
+        .block(preview_block)
+        .style(Style::default().fg(Color::Gray))
+        .wrap(ratatui::widgets::Wrap { trim: false })
+        .scroll((app.preview_scroll, 0));
+    f.render_widget(preview_text, top_chunks[0]);
+
+    // パス一覧エリア (右)
+    let items: Vec<ListItem> = app
+        .filtered_indices
+        .iter()
+        .map(|&idx| {
+            let path = &app.paths[idx];
+            ListItem::new(path.display().to_string())
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .title("Paths")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::White)),
+        )
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    let mut state = ListState::default();
+    state.select(Some(app.selected));
+    f.render_stateful_widget(list, top_chunks[1], &mut state);
+
+    // 入力エリア (下)
+    let input_block = Block::default()
+        .title("Search")
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White));
+
+    let input_text = Paragraph::new(app.input.as_str())
+        .block(input_block)
+        .style(Style::default().fg(Color::Yellow));
+    f.render_widget(input_text, chunks[1]);
+}
+
+/// TUIを実行する
+///
+/// # Arguments
+/// * `pavo` - Pavoインスタンス
+pub fn run_tui(pavo: &mut Pavo) -> Result<()> {
+    // ターミナルのセットアップ
+    enable_raw_mode().context("Failed to enable raw mode")?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+        .context("Failed to setup terminal")?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend).context("Failed to create terminal")?;
+
+    // アプリケーションの実行
+    let paths: Vec<PathBuf> = pavo
+        .get_paths()
+        .iter()
+        .map(|config_path| config_path.path.clone())
+        .collect();
+    let mut app = App::new(paths);
+
+    loop {
+        terminal.draw(|f| ui(f, &app))?;
+        handle_event(&mut app)?;
+
+        if app.should_quit {
+            break;
+        }
+    }
+
+    // ターミナルの復元
+    disable_raw_mode().context("Failed to disable raw mode")?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )
+    .context("Failed to restore terminal")?;
+    terminal.show_cursor().context("Failed to show cursor")?;
+
+    // 選択されたパスを処理
+    if let Some(path) = app.selected_path {
+        pavo.update_last_selected(&path)?;
+        println!("{}", path.display());
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn create_test_env() -> TempDir {
+        let temp_dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(temp_dir.path().join("test1")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("test2")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("test3")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("other")).unwrap();
+        temp_dir
+    }
+
+    #[test]
+    fn test_app_new_空のパスリストで初期化される() {
+        // Arrange & Act
+        let app = App::new(vec![]);
+
+        // Assert
+        assert_eq!(app.paths.len(), 0);
+        assert_eq!(app.filtered_indices.len(), 0);
+        assert_eq!(app.selected, 0);
+        assert_eq!(app.input, "");
+        assert!(!app.should_quit);
+        assert!(app.selected_path.is_none());
+    }
+
+    #[test]
+    fn test_app_new_パスリストで初期化される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+
+        // Act
+        let app = App::new(paths.clone());
+
+        // Assert
+        assert_eq!(app.paths.len(), 2);
+        assert_eq!(app.filtered_indices, vec![0, 1]);
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_select_next_次のアイテムを選択する() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+            temp_dir.path().join("test3"),
+        ];
+        let mut app = App::new(paths);
+
+        // Act
+        app.select_next();
+
+        // Assert
+        assert_eq!(app.selected, 1);
+    }
+
+    #[test]
+    fn test_select_next_最後のアイテムから最初に戻る() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+        let mut app = App::new(paths);
+        app.selected = 1;
+
+        // Act
+        app.select_next();
+
+        // Assert
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_select_previous_前のアイテムを選択する() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+        let mut app = App::new(paths);
+        app.selected = 1;
+
+        // Act
+        app.select_previous();
+
+        // Assert
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_select_previous_最初のアイテムから最後に戻る() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+        let mut app = App::new(paths);
+
+        // Act
+        app.select_previous();
+
+        // Assert
+        assert_eq!(app.selected, 1);
+    }
+
+    #[test]
+    fn test_add_char_文字を追加して入力が更新される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+        let mut app = App::new(paths);
+
+        // Act
+        app.add_char('t');
+        app.add_char('e');
+
+        // Assert
+        assert_eq!(app.input, "te");
+    }
+
+    #[test]
+    fn test_delete_char_最後の文字が削除される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+        app.input = "test".to_string();
+
+        // Act
+        app.delete_char();
+
+        // Assert
+        assert_eq!(app.input, "tes");
+    }
+
+    #[test]
+    fn test_filter_paths_入力に基づいてフィルタリングされる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+            temp_dir.path().join("other"),
+        ];
+        let mut app = App::new(paths);
+
+        // Act
+        app.input = "test".to_string();
+        app.filter_paths();
+
+        // Assert
+        assert_eq!(app.filtered_indices.len(), 2);
+        assert!(app.filtered_indices.contains(&0));
+        assert!(app.filtered_indices.contains(&1));
+    }
+
+    #[test]
+    fn test_filter_paths_空の入力で全てのパスが表示される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+        let mut app = App::new(paths);
+
+        // Act
+        app.input = "".to_string();
+        app.filter_paths();
+
+        // Assert
+        assert_eq!(app.filtered_indices, vec![0, 1]);
+    }
+
+    #[test]
+    fn test_confirm_selection_選択したパスが確定される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("test2"),
+        ];
+        let mut app = App::new(paths.clone());
+        app.selected = 1;
+
+        // Act
+        app.confirm_selection();
+
+        // Assert
+        assert_eq!(app.selected_path, Some(paths[1].clone()));
+        assert!(app.should_quit);
+    }
+
+    #[test]
+    fn test_quit_アプリケーションが終了状態になる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+
+        // Act
+        app.quit();
+
+        // Assert
+        assert!(app.should_quit);
+    }
+}
