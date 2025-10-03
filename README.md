@@ -10,16 +10,14 @@ pavo(from favorite + path) is a tool to bookmark and easily reference files and 
 ### Linux
 
 ```bash
-VERSION='v0.1.1'
-curl -L "https://github.com/taiga533/pavo/releases/download/${VERSION}/pavo-x86_64-unknown-linux-gnu.tar.gz" \
+curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz" \
 | tar xz -C /usr/local/bin
 ```
 
 ### MacOS (Apple Silicon only)
 
 ```bash
-VERSION='v0.1.1'
-curl -L "https://github.com/taiga533/pavo/releases/download/${VERSION}/pavo-aarch64-apple-darwin.tar.gz" \
+curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-aarch64-apple-darwin.tar.gz" \
 | tar xz -C /usr/local/bin
 ```
 
@@ -67,12 +65,16 @@ max_unselected_time = 604800 # 7 days (unit: seconds)
 
 ## Shell Integration
 
+You can set up shell integration to easily navigate to bookmarked paths using the `p` command. The `p` command will change to the selected directory if it's a directory, or output the path if it's a file.
+
 ### Bash and Zsh
 
 Add the following line to your `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-alias cdp='cd "$(pavo)"'
+eval "$(pavo init bash)"
+# or for zsh
+eval "$(pavo init zsh)"
 ```
 
 ### Fish
@@ -80,5 +82,11 @@ alias cdp='cd "$(pavo)"'
 Add the following line to your `~/.config/fish/config.fish`:
 
 ```fish
-alias cdp='cd (pavo)'
+pavo init fish | source
+```
+
+After setting up shell integration, you can use the `p` command to navigate:
+
+```bash
+p  # Opens the TUI to select a bookmarked path and navigates to it
 ```

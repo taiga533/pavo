@@ -7,6 +7,7 @@ pub mod cli;
 pub mod config;
 pub mod entry;
 pub mod pavo;
+pub mod shell;
 #[cfg(test)]
 pub mod test_helper;
 pub mod tui;
@@ -35,6 +36,11 @@ pub fn run() -> anyhow::Result<()> {
         }
         Some(cli::Commands::Clean) => {
             pavo.clean()?;
+            Ok(())
+        }
+        Some(cli::Commands::Init { shell }) => {
+            let script = shell::generate_init_script(&shell)?;
+            println!("{}", script);
             Ok(())
         }
         None => {
