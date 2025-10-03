@@ -65,12 +65,16 @@ max_unselected_time = 604800 # 7 days (unit: seconds)
 
 ## Shell Integration
 
+You can set up shell integration to easily navigate to bookmarked paths using the `p` command. The `p` command will change to the selected directory if it's a directory, or output the path if it's a file.
+
 ### Bash and Zsh
 
 Add the following line to your `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-alias cdp='cd "$(pavo)"'
+eval "$(pavo init bash)"
+# or for zsh
+eval "$(pavo init zsh)"
 ```
 
 ### Fish
@@ -78,5 +82,11 @@ alias cdp='cd "$(pavo)"'
 Add the following line to your `~/.config/fish/config.fish`:
 
 ```fish
-alias cdp='cd (pavo)'
+pavo init fish | source
+```
+
+After setting up shell integration, you can use the `p` command to navigate:
+
+```bash
+p  # Opens the TUI to select a bookmarked path and navigates to it
 ```
