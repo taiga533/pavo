@@ -24,6 +24,12 @@ pub enum Commands {
 
     /// Open the configuration file with the editor specified by the EDITOR environment variable
     Config,
+
+    /// Generate shell integration script
+    Init {
+        /// Shell type to generate script for (bash, zsh, fish)
+        shell: String,
+    },
 }
 
 #[cfg(test)]
@@ -64,6 +70,39 @@ mod tests {
                 assert!(persist);
             }
             _ => panic!("Expected Add command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_init_bash() {
+        let cli = Cli::try_parse_from(&["pavo", "init", "bash"]).unwrap();
+        match cli.command {
+            Some(Commands::Init { shell }) => {
+                assert_eq!(shell, "bash");
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_init_zsh() {
+        let cli = Cli::try_parse_from(&["pavo", "init", "zsh"]).unwrap();
+        match cli.command {
+            Some(Commands::Init { shell }) => {
+                assert_eq!(shell, "zsh");
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_init_fish() {
+        let cli = Cli::try_parse_from(&["pavo", "init", "fish"]).unwrap();
+        match cli.command {
+            Some(Commands::Init { shell }) => {
+                assert_eq!(shell, "fish");
+            }
+            _ => panic!("Expected Init command"),
         }
     }
 }
