@@ -10,10 +10,10 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
+    text::Line,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use std::borrow::Cow;
 use std::io;
 use std::path::PathBuf;
 
@@ -35,8 +35,8 @@ pub struct App {
     should_quit: bool,
     /// 選択されたパス
     selected_path: Option<PathBuf>,
-    /// プレビューテキスト
-    preview: Cow<'static, str>,
+    /// プレビューテキスト（色付き）
+    preview: Vec<Line<'static>>,
     /// プレビューのスクロールオフセット
     preview_scroll: u16,
 }
@@ -49,12 +49,9 @@ impl App {
     pub fn new(paths: Vec<PathBuf>) -> Self {
         let filtered_indices: Vec<usize> = (0..paths.len()).collect();
         let preview = if !paths.is_empty() {
-            let preview_raw = Pavo::get_entry_preview(&paths[0]).unwrap_or_default();
-            // ANSIエスケープシーケンスを除去
-            let preview_clean = strip_ansi_escapes::strip_str(preview_raw.as_ref());
-            Cow::Owned(preview_clean)
+            Pavo::get_entry_preview(&paths[0]).unwrap_or_default()
         } else {
-            Cow::Borrowed("")
+            vec![]
         };
 
         Self {
@@ -97,12 +94,9 @@ impl App {
     /// プレビューを更新する
     fn update_preview(&mut self) {
         if let Some(&idx) = self.filtered_indices.get(self.selected) {
-            let preview_raw = Pavo::get_entry_preview(&self.paths[idx]).unwrap_or_default();
-            // ANSIエスケープシーケンスを除去
-            let preview_clean = strip_ansi_escapes::strip_str(preview_raw.as_ref());
-            self.preview = Cow::Owned(preview_clean);
+            self.preview = Pavo::get_entry_preview(&self.paths[idx]).unwrap_or_default();
         } else {
-            self.preview = Cow::Borrowed("");
+            self.preview = vec![];
         }
         self.preview_scroll = 0;
     }
@@ -208,9 +202,8 @@ fn ui(f: &mut Frame, app: &App) {
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::White));
 
-    let preview_text = Paragraph::new(app.preview.as_ref())
+    let preview_text = Paragraph::new(app.preview.clone())
         .block(preview_block)
-        .style(Style::default().fg(Color::Gray))
         .wrap(ratatui::widgets::Wrap { trim: false })
         .scroll((app.preview_scroll, 0));
     f.render_widget(preview_text, top_chunks[0]);
