@@ -11,14 +11,14 @@ pavo(from favorite + path) is a tool to bookmark and easily reference files and 
 
 ```bash
 curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz" \
-| tar xz -C /usr/local/bin
+| tar xz -C ~/.local/bin
 ```
 
 ### MacOS (Apple Silicon only)
 
 ```bash
 curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-aarch64-apple-darwin.tar.gz" \
-| tar xz -C /usr/local/bin
+| tar xz -C ~/.local/bin
 ```
 
 After installation, it is recommended to set up [Shell Integration](#shell-integration) as described below to easily navigate to bookmarked paths using commands like `cd`.
