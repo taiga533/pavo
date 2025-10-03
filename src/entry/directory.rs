@@ -35,10 +35,7 @@ impl DirectoryEntry {
         }
 
         if *entries_count >= max_entries {
-            let line = Line::from(vec![
-                Span::raw(prefix.to_string()),
-                Span::raw("└── ..."),
-            ]);
+            let line = Line::from(vec![Span::raw(prefix.to_string()), Span::raw("└── ...")]);
             output.push(line);
             return Ok(true);
         }
@@ -61,10 +58,7 @@ impl DirectoryEntry {
 
         for (i, entry) in entries.iter().enumerate() {
             if *entries_count >= max_entries && i < entries.len() {
-                let line = Line::from(vec![
-                    Span::raw(prefix.to_string()),
-                    Span::raw("└── ..."),
-                ]);
+                let line = Line::from(vec![Span::raw(prefix.to_string()), Span::raw("└── ...")]);
                 output.push(line);
                 return Ok(true);
             }
@@ -76,10 +70,7 @@ impl DirectoryEntry {
 
             let line = if current_depth == 0 {
                 if is_dir {
-                    Line::from(Span::styled(
-                        name_str,
-                        Style::default().fg(Color::Green),
-                    ))
+                    Line::from(Span::styled(name_str, Style::default().fg(Color::Green)))
                 } else {
                     Line::from(name_str)
                 }

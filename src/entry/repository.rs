@@ -29,7 +29,10 @@ pub fn format_latest_commit(commit: &git2::Commit) -> Vec<Line<'static>> {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
                 Span::raw("    "),
-                Span::styled(first_line.to_string(), Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    first_line.to_string(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
             ]));
         }
     }

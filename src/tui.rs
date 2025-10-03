@@ -331,10 +331,7 @@ mod tests {
     fn test_app_new_パスリストで初期化される() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
 
         // Act
         let app = App::new(paths.clone());
@@ -367,10 +364,7 @@ mod tests {
     fn test_select_next_最後のアイテムから最初に戻る() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
         let mut app = App::new(paths);
         app.selected = 1;
 
@@ -385,10 +379,7 @@ mod tests {
     fn test_select_previous_前のアイテムを選択する() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
         let mut app = App::new(paths);
         app.selected = 1;
 
@@ -403,10 +394,7 @@ mod tests {
     fn test_select_previous_最初のアイテムから最後に戻る() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
         let mut app = App::new(paths);
 
         // Act
@@ -420,10 +408,7 @@ mod tests {
     fn test_add_char_文字を追加して入力が更新される() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
         let mut app = App::new(paths);
 
         // Act
@@ -474,10 +459,7 @@ mod tests {
     fn test_filter_paths_空の入力で全てのパスが表示される() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
         let mut app = App::new(paths);
 
         // Act
@@ -492,10 +474,7 @@ mod tests {
     fn test_confirm_selection_選択したパスが確定される() {
         // Arrange
         let temp_dir = create_test_env();
-        let paths = vec![
-            temp_dir.path().join("test1"),
-            temp_dir.path().join("test2"),
-        ];
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
         let mut app = App::new(paths.clone());
         app.selected = 1;
 
