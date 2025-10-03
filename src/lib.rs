@@ -7,9 +7,9 @@ pub mod cli;
 pub mod config;
 pub mod entry;
 pub mod pavo;
-pub mod tui;
 #[cfg(test)]
 pub mod test_helper;
+pub mod tui;
 
 pub fn run() -> anyhow::Result<()> {
     let config_dir = std::env::var("PATH_HOPPER_CONFIG_DIR")
