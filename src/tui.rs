@@ -283,17 +283,15 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
                 (KeyCode::BackTab, _) => {
                     app.focus_previous_panel();
                 }
-                (KeyCode::Enter, _) => {
-                    match app.focused_panel {
-                        FocusedPanel::Search => {
-                            app.confirm_selection();
-                        }
-                        FocusedPanel::Paths => {
-                            app.open_modal(pavo);
-                        }
-                        FocusedPanel::Preview => {}
+                (KeyCode::Enter, _) => match app.focused_panel {
+                    FocusedPanel::Search => {
+                        app.confirm_selection();
                     }
-                }
+                    FocusedPanel::Paths => {
+                        app.open_modal(pavo);
+                    }
+                    FocusedPanel::Preview => {}
+                },
                 (KeyCode::Down, _) | (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
                     match app.focused_panel {
                         FocusedPanel::Search | FocusedPanel::Paths => {
@@ -353,12 +351,18 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
 
     // プレビューエリア (左)
     let preview_title = if app.focused_panel == FocusedPanel::Preview {
-        format!("{} [Tab → {}]", FocusedPanel::Preview.name(), next_panel_name)
+        format!(
+            "{} [Tab → {}]",
+            FocusedPanel::Preview.name(),
+            next_panel_name
+        )
     } else {
         FocusedPanel::Preview.name().to_string()
     };
     let preview_style = if app.focused_panel == FocusedPanel::Preview {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
@@ -395,7 +399,9 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
         FocusedPanel::Paths.name().to_string()
     };
     let paths_style = if app.focused_panel == FocusedPanel::Paths {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
@@ -421,12 +427,18 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
 
     // 入力エリア (下)
     let search_title = if app.focused_panel == FocusedPanel::Search {
-        format!("{} [Tab → {}]", FocusedPanel::Search.name(), next_panel_name)
+        format!(
+            "{} [Tab → {}]",
+            FocusedPanel::Search.name(),
+            next_panel_name
+        )
     } else {
         FocusedPanel::Search.name().to_string()
     };
     let search_style = if app.focused_panel == FocusedPanel::Search {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
@@ -474,7 +486,11 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
         String::new()
     };
 
-    let checkbox = if app.modal_persist_value { "[x]" } else { "[ ]" };
+    let checkbox = if app.modal_persist_value {
+        "[x]"
+    } else {
+        "[ ]"
+    };
 
     let modal_text = format!(
         "Path: {}\n\n\
@@ -486,7 +502,11 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
     let modal_block = Block::default()
         .title("Path Setting")
         .borders(Borders::ALL)
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
 
     let modal_paragraph = Paragraph::new(modal_text)
         .block(modal_block)
