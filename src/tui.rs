@@ -240,15 +240,7 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
                     KeyCode::Enter => {
                         if let Some((idx, new_persist)) = app.confirm_modal() {
                             let path = &app.paths[idx];
-                            let current_persist = pavo
-                                .get_paths()
-                                .iter()
-                                .find(|cp| cp.path == *path)
-                                .map(|cp| cp.persist)
-                                .unwrap_or(false);
-                            if current_persist != new_persist {
-                                pavo.toggle_persist(path)?;
-                            }
+                            pavo.set_persist(path, new_persist)?;
                         }
                         app.close_modal();
                     }
