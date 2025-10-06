@@ -444,19 +444,18 @@ fn draw_modal(f: &mut Frame, app: &App, pavo: &Pavo) {
         ("".to_string(), false)
     };
 
-    let status = if current_persist { "ON" } else { "OFF" };
-    let new_status = if current_persist { "OFF" } else { "ON" };
+    let status_checkbox = if current_persist { "[x]" } else { "[ ]" };
+    let toggle_checkbox = if current_persist { "[ ]" } else { "[x]" };
 
     let modal_text = format!(
-        "Toggle Persist\n\n\
-         Path: {}\n\
-         Current: {}\n\n\
+        "Path: {}\n\n\
+         Persist: {}\n\n\
          Press 'y' to toggle to {}, 'n' to cancel",
-        path_display, status, new_status
+        path_display, status_checkbox, toggle_checkbox
     );
 
     let modal_block = Block::default()
-        .title("Persist Setting")
+        .title("Path Setting")
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
 
