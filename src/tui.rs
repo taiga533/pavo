@@ -733,4 +733,159 @@ mod tests {
         // Assert
         assert!(app.should_quit);
     }
+
+    #[test]
+    fn test_focus_next_panel_フォーカスが次のパネルに移動する() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+
+        // Act & Assert
+        assert_eq!(app.focused_panel, FocusedPanel::Search);
+        app.focus_next_panel();
+        assert_eq!(app.focused_panel, FocusedPanel::Paths);
+        app.focus_next_panel();
+        assert_eq!(app.focused_panel, FocusedPanel::Preview);
+        app.focus_next_panel();
+        assert_eq!(app.focused_panel, FocusedPanel::Search);
+    }
+
+    #[test]
+    fn test_focus_previous_panel_フォーカスが前のパネルに移動する() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+
+        // Act & Assert
+        assert_eq!(app.focused_panel, FocusedPanel::Search);
+        app.focus_previous_panel();
+        assert_eq!(app.focused_panel, FocusedPanel::Preview);
+        app.focus_previous_panel();
+        assert_eq!(app.focused_panel, FocusedPanel::Paths);
+        app.focus_previous_panel();
+        assert_eq!(app.focused_panel, FocusedPanel::Search);
+    }
+
+    #[test]
+    fn test_scroll_preview_up_プレビューが上にスクロールする() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+        app.preview_scroll = 5;
+
+        // Act
+        app.scroll_preview_up();
+
+        // Assert
+        assert_eq!(app.preview_scroll, 4);
+    }
+
+    #[test]
+    fn test_scroll_preview_up_0の場合は変化しない() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+        app.preview_scroll = 0;
+
+        // Act
+        app.scroll_preview_up();
+
+        // Assert
+        assert_eq!(app.preview_scroll, 0);
+    }
+
+    #[test]
+    fn test_scroll_preview_down_プレビューが下にスクロールする() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+        app.preview_scroll = 5;
+
+        // Act
+        app.scroll_preview_down();
+
+        // Assert
+        assert_eq!(app.preview_scroll, 6);
+    }
+
+    #[test]
+    fn test_toggle_modal_persist_値がトグルされる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+        app.modal_persist_value = false;
+
+        // Act
+        app.toggle_modal_persist();
+
+        // Assert
+        assert!(app.modal_persist_value);
+
+        // Act
+        app.toggle_modal_persist();
+
+        // Assert
+        assert!(!app.modal_persist_value);
+    }
+
+    #[test]
+    fn test_open_modal_モーダルが開かれてpersist値が設定される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let test_path = temp_dir.path().join("test1");
+        let canonical_path = test_path.canonicalize().unwrap();
+        let paths = vec![canonical_path.clone()];
+        let mut app = App::new(paths);
+
+        let config_dir = tempfile::tempdir().unwrap();
+        let mut pavo = crate::Pavo::new(Some(config_dir.path().to_path_buf())).unwrap();
+        pavo.add_path(test_path.to_str().unwrap(), true).unwrap();
+
+        // Act
+        app.open_modal(&pavo);
+
+        // Assert
+        assert!(app.show_modal);
+        assert!(app.modal_persist_value);
+    }
+
+    #[test]
+    fn test_close_modal_モーダルが閉じられる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths);
+        app.show_modal = true;
+
+        // Act
+        app.close_modal();
+
+        // Assert
+        assert!(!app.show_modal);
+    }
+
+    #[test]
+    fn test_confirm_modal_選択中のパスとpersist値を返す() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
+        let mut app = App::new(paths);
+        app.selected = 1;
+        app.modal_persist_value = true;
+
+        // Act
+        let result = app.confirm_modal();
+
+        // Assert
+        assert!(result.is_some());
+        let (idx, persist) = result.unwrap();
+        assert_eq!(idx, 1);
+        assert!(persist);
+    }
 }

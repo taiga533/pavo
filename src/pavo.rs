@@ -237,4 +237,88 @@ mod tests {
         assert!(result.is_ok());
         assert!(pavo.contains(&temp_dir.path().join("test_dir").canonicalize().unwrap()));
     }
+
+    #[test]
+    fn test_set_persist_値が設定される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // persistをtrueに設定
+        let result = pavo.set_persist(&canonical_path, true);
+        assert!(result.is_ok());
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(config_path.persist);
+
+        // persistをfalseに設定
+        let result = pavo.set_persist(&canonical_path, false);
+        assert!(result.is_ok());
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(!config_path.persist);
+    }
+
+    #[test]
+    fn test_set_persist_設定ファイルに保存される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+        pavo.set_persist(&canonical_path, true).unwrap();
+
+        // 設定ファイルを読み込んで確認
+        let config_file = pavo.get_config_file();
+        let content = std::fs::read_to_string(config_file).unwrap();
+        assert!(content.contains("persist = true"));
+    }
+
+    #[test]
+    fn test_toggle_persist_値がトグルされる() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // 最初はfalse
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(!config_path.persist);
+
+        // トグルしてtrueに
+        pavo.toggle_persist(&canonical_path).unwrap();
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(config_path.persist);
+
+        // もう一度トグルしてfalseに
+        pavo.toggle_persist(&canonical_path).unwrap();
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(!config_path.persist);
+    }
 }
