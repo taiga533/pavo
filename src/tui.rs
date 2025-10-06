@@ -50,6 +50,8 @@ pub struct App {
     focused_panel: FocusedPanel,
     /// モーダルを表示するかどうか
     show_modal: bool,
+    /// モーダル内で選択中のpersist値
+    modal_persist_value: bool,
 }
 
 impl App {
@@ -77,6 +79,7 @@ impl App {
             preview_scroll: 0,
             focused_panel: FocusedPanel::Search,
             show_modal: false,
+            modal_persist_value: false,
         }
     }
 
@@ -190,8 +193,17 @@ impl App {
     }
 
     /// モーダルを開く
-    fn open_modal(&mut self) {
-        self.show_modal = true;
+    fn open_modal(&mut self, pavo: &Pavo) {
+        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+            let path = &self.paths[idx];
+            self.modal_persist_value = pavo
+                .get_paths()
+                .iter()
+                .find(|cp| cp.path == *path)
+                .map(|cp| cp.persist)
+                .unwrap_or(false);
+            self.show_modal = true;
+        }
     }
 
     /// モーダルを閉じる
@@ -199,9 +211,18 @@ impl App {
         self.show_modal = false;
     }
 
-    /// 選択中のパスのpersistをトグルする
-    fn toggle_persist(&mut self) -> Option<usize> {
-        self.filtered_indices.get(self.selected).copied()
+    /// モーダル内でpersist値をトグルする
+    fn toggle_modal_persist(&mut self) {
+        self.modal_persist_value = !self.modal_persist_value;
+    }
+
+    /// モーダルの変更を確定する
+    fn confirm_modal(&mut self) -> Option<(usize, bool)> {
+        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+            Some((idx, self.modal_persist_value))
+        } else {
+            None
+        }
     }
 }
 
@@ -216,13 +237,25 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
             // モーダルが開いている場合の処理
             if app.show_modal {
                 match key.code {
-                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                        if let Some(idx) = app.toggle_persist() {
-                            pavo.toggle_persist(&app.paths[idx])?;
+                    KeyCode::Enter => {
+                        if let Some((idx, new_persist)) = app.confirm_modal() {
+                            let path = &app.paths[idx];
+                            let current_persist = pavo
+                                .get_paths()
+                                .iter()
+                                .find(|cp| cp.path == *path)
+                                .map(|cp| cp.persist)
+                                .unwrap_or(false);
+                            if current_persist != new_persist {
+                                pavo.toggle_persist(path)?;
+                            }
                         }
                         app.close_modal();
                     }
-                    KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    KeyCode::Up | KeyCode::Down | KeyCode::Char(' ') => {
+                        app.toggle_modal_persist();
+                    }
+                    KeyCode::Esc => {
                         app.close_modal();
                     }
                     _ => {}
@@ -247,7 +280,7 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
                             app.confirm_selection();
                         }
                         FocusedPanel::Paths => {
-                            app.open_modal();
+                            app.open_modal(pavo);
                         }
                         FocusedPanel::Preview => {}
                     }
@@ -409,7 +442,7 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
 }
 
 /// モーダルを描画する
-fn draw_modal(f: &mut Frame, app: &App, pavo: &Pavo) {
+fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
     use ratatui::{
         layout::{Alignment, Rect},
         widgets::{Clear, Paragraph},
@@ -430,28 +463,19 @@ fn draw_modal(f: &mut Frame, app: &App, pavo: &Pavo) {
     f.render_widget(Clear, modal_area);
 
     // 選択中のパスの情報を取得
-    let (path_display, current_persist) = if let Some(&idx) = app.filtered_indices.get(app.selected)
-    {
-        let path = &app.paths[idx];
-        let persist = pavo
-            .get_paths()
-            .iter()
-            .find(|cp| cp.path == *path)
-            .map(|cp| cp.persist)
-            .unwrap_or(false);
-        (path.display().to_string(), persist)
+    let path_display = if let Some(&idx) = app.filtered_indices.get(app.selected) {
+        app.paths[idx].display().to_string()
     } else {
-        ("".to_string(), false)
+        String::new()
     };
 
-    let status_checkbox = if current_persist { "[x]" } else { "[ ]" };
-    let toggle_checkbox = if current_persist { "[ ]" } else { "[x]" };
+    let checkbox = if app.modal_persist_value { "[x]" } else { "[ ]" };
 
     let modal_text = format!(
         "Path: {}\n\n\
-         Persist: {}\n\n\
-         Press 'y' to toggle to {}, 'n' to cancel",
-        path_display, status_checkbox, toggle_checkbox
+         {} Persist\n\n\
+         [↑/↓/Space] Toggle  [Enter] Confirm  [Esc] Cancel",
+        path_display, checkbox
     );
 
     let modal_block = Block::default()
