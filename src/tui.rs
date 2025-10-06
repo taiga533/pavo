@@ -260,8 +260,7 @@ pub fn run_tui(pavo: &mut Pavo) -> Result<()> {
         .write(true)
         .open("/dev/tty")
         .context("Failed to open /dev/tty")?;
-    execute!(tty, EnterAlternateScreen, EnableMouseCapture)
-        .context("Failed to setup terminal")?;
+    execute!(tty, EnterAlternateScreen, EnableMouseCapture).context("Failed to setup terminal")?;
     let backend = CrosstermBackend::new(tty);
     let mut terminal = Terminal::new(backend).context("Failed to create terminal")?;
 
