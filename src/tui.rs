@@ -18,6 +18,14 @@ use std::path::PathBuf;
 
 use crate::Pavo;
 
+/// フォーカス中のパネル
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FocusedPanel {
+    Search,
+    Paths,
+    Preview,
+}
+
 /// TUIアプリケーションの状態を管理する構造体
 pub struct App {
     /// パスのリスト
@@ -38,6 +46,10 @@ pub struct App {
     preview: Vec<Line<'static>>,
     /// プレビューのスクロールオフセット
     preview_scroll: u16,
+    /// フォーカス中のパネル
+    focused_panel: FocusedPanel,
+    /// モーダルを表示するかどうか
+    show_modal: bool,
 }
 
 impl App {
@@ -63,6 +75,8 @@ impl App {
             selected_path: None,
             preview,
             preview_scroll: 0,
+            focused_panel: FocusedPanel::Search,
+            show_modal: false,
         }
     }
 
@@ -144,33 +158,129 @@ impl App {
     fn quit(&mut self) {
         self.should_quit = true;
     }
+
+    /// 次のパネルにフォーカスを移動する
+    fn focus_next_panel(&mut self) {
+        self.focused_panel = match self.focused_panel {
+            FocusedPanel::Search => FocusedPanel::Paths,
+            FocusedPanel::Paths => FocusedPanel::Preview,
+            FocusedPanel::Preview => FocusedPanel::Search,
+        };
+    }
+
+    /// 前のパネルにフォーカスを移動する
+    fn focus_previous_panel(&mut self) {
+        self.focused_panel = match self.focused_panel {
+            FocusedPanel::Search => FocusedPanel::Preview,
+            FocusedPanel::Paths => FocusedPanel::Search,
+            FocusedPanel::Preview => FocusedPanel::Paths,
+        };
+    }
+
+    /// プレビューを上にスクロールする
+    fn scroll_preview_up(&mut self) {
+        if self.preview_scroll > 0 {
+            self.preview_scroll -= 1;
+        }
+    }
+
+    /// プレビューを下にスクロールする
+    fn scroll_preview_down(&mut self) {
+        self.preview_scroll += 1;
+    }
+
+    /// モーダルを開く
+    fn open_modal(&mut self) {
+        self.show_modal = true;
+    }
+
+    /// モーダルを閉じる
+    fn close_modal(&mut self) {
+        self.show_modal = false;
+    }
+
+    /// 選択中のパスのpersistをトグルする
+    fn toggle_persist(&mut self) -> Option<usize> {
+        self.filtered_indices.get(self.selected).copied()
+    }
 }
 
 /// TUIのイベントハンドリング
 ///
 /// # Arguments
 /// * `app` - アプリケーションの状態
-fn handle_event(app: &mut App) -> Result<()> {
+/// * `pavo` - Pavoインスタンス
+fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
     if event::poll(std::time::Duration::from_millis(100))? {
         if let Event::Key(key) = event::read()? {
+            // モーダルが開いている場合の処理
+            if app.show_modal {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        if let Some(idx) = app.toggle_persist() {
+                            pavo.toggle_persist(&app.paths[idx])?;
+                        }
+                        app.close_modal();
+                    }
+                    KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                        app.close_modal();
+                    }
+                    _ => {}
+                }
+                return Ok(());
+            }
+
+            // 通常の操作
             match (key.code, key.modifiers) {
                 (KeyCode::Char('c'), KeyModifiers::CONTROL) | (KeyCode::Esc, _) => {
                     app.quit();
                 }
+                (KeyCode::Tab, KeyModifiers::NONE) => {
+                    app.focus_next_panel();
+                }
+                (KeyCode::BackTab, _) => {
+                    app.focus_previous_panel();
+                }
                 (KeyCode::Enter, _) => {
-                    app.confirm_selection();
+                    match app.focused_panel {
+                        FocusedPanel::Search => {
+                            app.confirm_selection();
+                        }
+                        FocusedPanel::Paths => {
+                            app.open_modal();
+                        }
+                        FocusedPanel::Preview => {}
+                    }
                 }
                 (KeyCode::Down, _) | (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
-                    app.select_next();
+                    match app.focused_panel {
+                        FocusedPanel::Search | FocusedPanel::Paths => {
+                            app.select_next();
+                        }
+                        FocusedPanel::Preview => {
+                            app.scroll_preview_down();
+                        }
+                    }
                 }
                 (KeyCode::Up, _) | (KeyCode::Char('p'), KeyModifiers::CONTROL) => {
-                    app.select_previous();
+                    match app.focused_panel {
+                        FocusedPanel::Search | FocusedPanel::Paths => {
+                            app.select_previous();
+                        }
+                        FocusedPanel::Preview => {
+                            app.scroll_preview_up();
+                        }
+                    }
                 }
                 (KeyCode::Backspace, _) => {
-                    app.delete_char();
+                    if app.focused_panel == FocusedPanel::Search {
+                        app.delete_char();
+                    }
                 }
-                (KeyCode::Char(c), _) => {
-                    app.add_char(c);
+                (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+                    if app.focused_panel == FocusedPanel::Search {
+                        app.add_char(c);
+                    }
                 }
                 _ => {}
             }
@@ -184,7 +294,8 @@ fn handle_event(app: &mut App) -> Result<()> {
 /// # Arguments
 /// * `f` - フレーム
 /// * `app` - アプリケーションの状態
-fn ui(f: &mut Frame, app: &App) {
+/// * `pavo` - Pavoインスタンス
+fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(3)])
@@ -195,11 +306,28 @@ fn ui(f: &mut Frame, app: &App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[0]);
 
+    // 次のパネルを取得
+    let next_panel_name = match app.focused_panel {
+        FocusedPanel::Search => "Paths",
+        FocusedPanel::Paths => "Preview",
+        FocusedPanel::Preview => "Search",
+    };
+
     // プレビューエリア (左)
+    let preview_title = if app.focused_panel == FocusedPanel::Preview {
+        format!("Preview [Tab → {}]", next_panel_name)
+    } else {
+        "Preview".to_string()
+    };
+    let preview_style = if app.focused_panel == FocusedPanel::Preview {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
     let preview_block = Block::default()
-        .title("Preview")
+        .title(preview_title)
         .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White));
+        .style(preview_style);
 
     let preview_text = Paragraph::new(app.preview.clone())
         .block(preview_block)
@@ -208,21 +336,38 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_widget(preview_text, top_chunks[0]);
 
     // パス一覧エリア (右)
+    let config_paths = pavo.get_paths();
     let items: Vec<ListItem> = app
         .filtered_indices
         .iter()
         .map(|&idx| {
             let path = &app.paths[idx];
-            ListItem::new(path.display().to_string())
+            let persist_mark = config_paths
+                .iter()
+                .find(|cp| cp.path == *path)
+                .map(|cp| if cp.persist { " [P]" } else { "" })
+                .unwrap_or("");
+            ListItem::new(format!("{}{}", path.display(), persist_mark))
         })
         .collect();
+
+    let paths_title = if app.focused_panel == FocusedPanel::Paths {
+        format!("Paths [Tab → {}]", next_panel_name)
+    } else {
+        "Paths".to_string()
+    };
+    let paths_style = if app.focused_panel == FocusedPanel::Paths {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
 
     let list = List::new(items)
         .block(
             Block::default()
-                .title("Paths")
+                .title(paths_title)
                 .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White)),
+                .style(paths_style),
         )
         .highlight_style(
             Style::default()
@@ -237,15 +382,90 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_stateful_widget(list, top_chunks[1], &mut state);
 
     // 入力エリア (下)
+    let search_title = if app.focused_panel == FocusedPanel::Search {
+        format!("Search [Tab → {}]", next_panel_name)
+    } else {
+        "Search".to_string()
+    };
+    let search_style = if app.focused_panel == FocusedPanel::Search {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
     let input_block = Block::default()
-        .title("Search")
+        .title(search_title)
         .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White));
+        .style(search_style);
 
     let input_text = Paragraph::new(app.input.as_str())
         .block(input_block)
         .style(Style::default().fg(Color::Yellow));
     f.render_widget(input_text, chunks[1]);
+
+    // モーダルを描画
+    if app.show_modal {
+        draw_modal(f, app, pavo);
+    }
+}
+
+/// モーダルを描画する
+fn draw_modal(f: &mut Frame, app: &App, pavo: &Pavo) {
+    use ratatui::{
+        layout::{Alignment, Rect},
+        widgets::{Clear, Paragraph},
+    };
+
+    // 中央にモーダルを配置
+    let area = f.area();
+    let modal_width = 60;
+    let modal_height = 7;
+    let modal_area = Rect {
+        x: (area.width.saturating_sub(modal_width)) / 2,
+        y: (area.height.saturating_sub(modal_height)) / 2,
+        width: modal_width.min(area.width),
+        height: modal_height.min(area.height),
+    };
+
+    // 背景をクリア
+    f.render_widget(Clear, modal_area);
+
+    // 選択中のパスの情報を取得
+    let (path_display, current_persist) = if let Some(&idx) = app.filtered_indices.get(app.selected)
+    {
+        let path = &app.paths[idx];
+        let persist = pavo
+            .get_paths()
+            .iter()
+            .find(|cp| cp.path == *path)
+            .map(|cp| cp.persist)
+            .unwrap_or(false);
+        (path.display().to_string(), persist)
+    } else {
+        ("".to_string(), false)
+    };
+
+    let status = if current_persist { "ON" } else { "OFF" };
+    let new_status = if current_persist { "OFF" } else { "ON" };
+
+    let modal_text = format!(
+        "Toggle Persist\n\n\
+         Path: {}\n\
+         Current: {}\n\n\
+         Press 'y' to toggle to {}, 'n' to cancel",
+        path_display, status, new_status
+    );
+
+    let modal_block = Block::default()
+        .title("Persist Setting")
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+
+    let modal_paragraph = Paragraph::new(modal_text)
+        .block(modal_block)
+        .alignment(Alignment::Left)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+
+    f.render_widget(modal_paragraph, modal_area);
 }
 
 /// TUIを実行する
@@ -273,8 +493,8 @@ pub fn run_tui(pavo: &mut Pavo) -> Result<()> {
     let mut app = App::new(paths);
 
     loop {
-        terminal.draw(|f| ui(f, &app))?;
-        handle_event(&mut app)?;
+        terminal.draw(|f| ui(f, &app, pavo))?;
+        handle_event(&mut app, pavo)?;
 
         if app.should_quit {
             break;

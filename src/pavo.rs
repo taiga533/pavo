@@ -84,6 +84,14 @@ impl Pavo {
         }
         Ok(())
     }
+
+    pub fn toggle_persist(&mut self, path: &Path) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            config_path.persist = !config_path.persist;
+            self.config.save(&self.config_file)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
