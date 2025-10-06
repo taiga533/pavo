@@ -110,22 +110,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::test_helper;
-
-    // Vec<Line>を文字列に変換するヘルパー関数
-    #[cfg(test)]
-    fn lines_to_string(lines: &[ratatui::text::Line]) -> String {
-        lines
-            .iter()
-            .map(|line| {
-                line.spans
-                    .iter()
-                    .map(|span| span.content.as_ref())
-                    .collect::<String>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
+    use crate::test_helper::{self, lines_to_string};
 
     #[cfg(test)]
     fn setup() -> (Pavo, tempfile::TempDir) {
