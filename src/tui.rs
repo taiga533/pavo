@@ -237,7 +237,7 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
             // モーダルが開いている場合の処理
             if app.show_modal {
                 match key.code {
-                    KeyCode::Enter => {
+                    KeyCode::Enter | KeyCode::Esc => {
                         if let Some((idx, new_persist)) = app.confirm_modal() {
                             let path = &app.paths[idx];
                             pavo.set_persist(path, new_persist)?;
@@ -246,9 +246,6 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
                     }
                     KeyCode::Up | KeyCode::Down | KeyCode::Char(' ') => {
                         app.toggle_modal_persist();
-                    }
-                    KeyCode::Esc => {
-                        app.close_modal();
                     }
                     _ => {}
                 }
@@ -466,7 +463,7 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
     let modal_text = format!(
         "Path: {}\n\n\
          {} Persist\n\n\
-         [↑/↓/Space] Toggle  [Enter] Confirm  [Esc] Cancel",
+         [↑/↓/Space] Toggle  [Enter/Esc] Close",
         path_display, checkbox
     );
 
