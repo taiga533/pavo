@@ -26,6 +26,26 @@ enum FocusedPanel {
     Preview,
 }
 
+impl FocusedPanel {
+    /// 次のパネルを取得する
+    fn next(self) -> Self {
+        match self {
+            Self::Search => Self::Paths,
+            Self::Paths => Self::Preview,
+            Self::Preview => Self::Search,
+        }
+    }
+
+    /// パネル名を取得する
+    fn name(self) -> &'static str {
+        match self {
+            Self::Search => "Search",
+            Self::Paths => "Paths",
+            Self::Preview => "Preview",
+        }
+    }
+}
+
 /// TUIアプリケーションの状態を管理する構造体
 pub struct App {
     /// パスのリスト
@@ -328,18 +348,14 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[0]);
 
-    // 次のパネルを取得
-    let next_panel_name = match app.focused_panel {
-        FocusedPanel::Search => "Paths",
-        FocusedPanel::Paths => "Preview",
-        FocusedPanel::Preview => "Search",
-    };
+    // 次のパネル名を取得
+    let next_panel_name = app.focused_panel.next().name();
 
     // プレビューエリア (左)
     let preview_title = if app.focused_panel == FocusedPanel::Preview {
-        format!("Preview [Tab → {}]", next_panel_name)
+        format!("{} [Tab → {}]", FocusedPanel::Preview.name(), next_panel_name)
     } else {
-        "Preview".to_string()
+        FocusedPanel::Preview.name().to_string()
     };
     let preview_style = if app.focused_panel == FocusedPanel::Preview {
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
@@ -374,9 +390,9 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
         .collect();
 
     let paths_title = if app.focused_panel == FocusedPanel::Paths {
-        format!("Paths [Tab → {}]", next_panel_name)
+        format!("{} [Tab → {}]", FocusedPanel::Paths.name(), next_panel_name)
     } else {
-        "Paths".to_string()
+        FocusedPanel::Paths.name().to_string()
     };
     let paths_style = if app.focused_panel == FocusedPanel::Paths {
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
@@ -405,9 +421,9 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
 
     // 入力エリア (下)
     let search_title = if app.focused_panel == FocusedPanel::Search {
-        format!("Search [Tab → {}]", next_panel_name)
+        format!("{} [Tab → {}]", FocusedPanel::Search.name(), next_panel_name)
     } else {
-        "Search".to_string()
+        FocusedPanel::Search.name().to_string()
     };
     let search_style = if app.focused_panel == FocusedPanel::Search {
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)

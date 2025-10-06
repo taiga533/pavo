@@ -1,7 +1,22 @@
 use git2::Repository;
+use ratatui::text::Line;
 use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
+
+#[cfg(test)]
+pub fn lines_to_string(lines: &[Line]) -> String {
+    lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .map(|span| span.content.as_ref())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 
 #[cfg(test)]
 pub fn setup_test_repo(dir: &TempDir) -> Repository {

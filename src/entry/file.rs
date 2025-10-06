@@ -77,22 +77,9 @@ mod tests {
     use std::fs::File;
 
     use super::*;
+    use crate::test_helper::lines_to_string;
     use std::io::Write;
     use tempfile::tempdir;
-
-    // Vec<Line>を文字列に変換するヘルパー関数
-    fn lines_to_string(lines: &[Line]) -> String {
-        lines
-            .iter()
-            .map(|line| {
-                line.spans
-                    .iter()
-                    .map(|span| span.content.as_ref())
-                    .collect::<String>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
 
     #[test]
     fn test_get_preview() {
