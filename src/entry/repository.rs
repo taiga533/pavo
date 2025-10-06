@@ -111,21 +111,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::test_helper::setup_test_repo;
-
-    // Vec<Line>を文字列に変換するヘルパー関数
-    fn lines_to_string(lines: &[Line]) -> String {
-        lines
-            .iter()
-            .map(|line| {
-                line.spans
-                    .iter()
-                    .map(|span| span.content.as_ref())
-                    .collect::<String>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
+    use crate::test_helper::{lines_to_string, setup_test_repo};
 
     #[test]
     fn test_repository_entry_branch_info() {
