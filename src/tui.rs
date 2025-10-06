@@ -14,7 +14,6 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use std::io;
 use std::path::PathBuf;
 
 use crate::Pavo;
@@ -256,10 +255,13 @@ fn ui(f: &mut Frame, app: &App) {
 pub fn run_tui(pavo: &mut Pavo) -> Result<()> {
     // ターミナルのセットアップ
     enable_raw_mode().context("Failed to enable raw mode")?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
-        .context("Failed to setup terminal")?;
-    let backend = CrosstermBackend::new(stdout);
+    let mut tty = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+        .context("Failed to open /dev/tty")?;
+    execute!(tty, EnterAlternateScreen, EnableMouseCapture).context("Failed to setup terminal")?;
+    let backend = CrosstermBackend::new(tty);
     let mut terminal = Terminal::new(backend).context("Failed to create terminal")?;
 
     // アプリケーションの実行

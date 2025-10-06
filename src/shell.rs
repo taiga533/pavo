@@ -23,8 +23,8 @@ fn generate_bash_zsh_script() -> String {
 
 p() {
     local result
-    result=$(pavo)
-    if [ -n "$result" ]; then
+    result=$(pavo </dev/tty)
+    if [ $? -eq 0 ] && [ -n "$result" ]; then
         if [ -d "$result" ]; then
             cd "$result" || return
         else
@@ -42,8 +42,8 @@ fn generate_fish_script() -> String {
 # pavo init fish | source
 
 function p
-    set -l result (pavo)
-    if test -n "$result"
+    set -l result (pavo </dev/tty)
+    if test $status -eq 0 -a -n "$result"
         if test -d "$result"
             cd $result
         else
@@ -64,6 +64,8 @@ mod tests {
         let script = generate_init_script("bash").unwrap();
         assert!(script.contains("p() {"));
         assert!(script.contains("cd \"$result\""));
+        assert!(script.contains("</dev/tty"));
+        assert!(script.contains("[ $? -eq 0 ]"));
     }
 
     #[test]
@@ -71,6 +73,8 @@ mod tests {
         let script = generate_init_script("zsh").unwrap();
         assert!(script.contains("p() {"));
         assert!(script.contains("cd \"$result\""));
+        assert!(script.contains("</dev/tty"));
+        assert!(script.contains("[ $? -eq 0 ]"));
     }
 
     #[test]
@@ -78,6 +82,8 @@ mod tests {
         let script = generate_init_script("fish").unwrap();
         assert!(script.contains("function p"));
         assert!(script.contains("cd $result"));
+        assert!(script.contains("</dev/tty"));
+        assert!(script.contains("test $status -eq 0"));
     }
 
     #[test]

@@ -11,14 +11,14 @@ pavo（favorite + path）は、編集したいファイルやディレクトリ�
 
 ```bash
 curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz" \
-| tar xz -C /usr/local/bin
+| tar xz -C ~/.local/bin
 ```
 
 ### MacOS（Apple Silicon のみ）
 
 ```bash
 curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-aarch64-apple-darwin.tar.gz" \
-| tar xz -C /usr/local/bin
+| tar xz -C ~/.local/bin
 ```
 
 インストール後、`cd`コマンドなどでブックマークしたパスへ簡単に移動できるように下記の[シェル統合](#シェル統合)セクションを参考に設定を行うことをお勧めします。
