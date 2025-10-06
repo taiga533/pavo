@@ -7,9 +7,10 @@ pub mod cli;
 pub mod config;
 pub mod entry;
 pub mod pavo;
-pub mod skim_proxy;
+pub mod shell;
 #[cfg(test)]
 pub mod test_helper;
+pub mod tui;
 
 pub fn run() -> anyhow::Result<()> {
     let config_dir = std::env::var("PATH_HOPPER_CONFIG_DIR")
@@ -37,9 +38,14 @@ pub fn run() -> anyhow::Result<()> {
             pavo.clean()?;
             Ok(())
         }
+        Some(cli::Commands::Init { shell }) => {
+            let script = shell::generate_init_script(&shell)?;
+            println!("{}", script);
+            Ok(())
+        }
         None => {
             pavo.clean()?;
-            skim_proxy::call_skim(&mut pavo)
+            tui::run_tui(&mut pavo)
         }
     }
 }

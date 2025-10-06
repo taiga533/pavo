@@ -1,6 +1,8 @@
 use crate::entry::Entry;
-use colored::Colorize;
-use std::borrow::Cow;
+use ratatui::{
+    style::{Color, Style},
+    text::{Line, Span},
+};
 use std::fs;
 use std::path::PathBuf;
 
@@ -22,7 +24,7 @@ impl DirectoryEntry {
     fn build_tree(
         path: &PathBuf,
         prefix: &str,
-        output: &mut String,
+        output: &mut Vec<Line<'static>>,
         current_depth: usize,
         max_depth: usize,
         max_entries: usize,
@@ -33,7 +35,8 @@ impl DirectoryEntry {
         }
 
         if *entries_count >= max_entries {
-            output.push_str(&format!("{}└── ...\n", prefix));
+            let line = Line::from(vec![Span::raw(prefix.to_string()), Span::raw("└── ...")]);
+            output.push(line);
             return Ok(true);
         }
 
@@ -55,28 +58,42 @@ impl DirectoryEntry {
 
         for (i, entry) in entries.iter().enumerate() {
             if *entries_count >= max_entries && i < entries.len() {
-                output.push_str(&format!("{}└── ...\n", prefix));
+                let line = Line::from(vec![Span::raw(prefix.to_string()), Span::raw("└── ...")]);
+                output.push(line);
                 return Ok(true);
             }
 
             let is_last = i == entries.len() - 1;
             let name = entry.file_name();
-            let name = name.to_string_lossy();
-            let name = if entry.file_type()?.is_dir() {
-                format!("{}", name.bright_green())
-            } else {
-                name.to_string()
-            };
+            let name_str = name.to_string_lossy().to_string();
+            let is_dir = entry.file_type()?.is_dir();
 
-            if current_depth == 0 {
-                output.push_str(&format!("{}\n", name));
+            let line = if current_depth == 0 {
+                if is_dir {
+                    Line::from(Span::styled(name_str, Style::default().fg(Color::Green)))
+                } else {
+                    Line::from(name_str)
+                }
             } else {
                 let connector = if is_last { "└── " } else { "├── " };
-                output.push_str(&format!("{}{}{}\n", prefix, connector, name));
-            }
+                if is_dir {
+                    Line::from(vec![
+                        Span::raw(prefix.to_string()),
+                        Span::raw(connector),
+                        Span::styled(name_str, Style::default().fg(Color::Green)),
+                    ])
+                } else {
+                    Line::from(vec![
+                        Span::raw(prefix.to_string()),
+                        Span::raw(connector),
+                        Span::raw(name_str),
+                    ])
+                }
+            };
+            output.push(line);
             *entries_count += 1;
 
-            if entry.file_type()?.is_dir() && current_depth < max_depth {
+            if is_dir && current_depth < max_depth {
                 let new_prefix = if current_depth == 0 {
                     String::new()
                 } else {
@@ -100,8 +117,8 @@ impl DirectoryEntry {
 }
 
 impl Entry for DirectoryEntry {
-    fn get_preview(&self) -> Cow<'static, str> {
-        let mut preview = String::new();
+    fn get_preview(&self) -> Vec<Line<'static>> {
+        let mut preview = Vec::new();
         let mut entries_count = 0;
         Self::build_tree(
             &self.path,
@@ -113,7 +130,7 @@ impl Entry for DirectoryEntry {
             &mut entries_count,
         )
         .unwrap();
-        preview.into()
+        preview
     }
 }
 
@@ -121,6 +138,20 @@ impl Entry for DirectoryEntry {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // Vec<Line>を文字列に変換するヘルパー関数
+    fn lines_to_string(lines: &[Line]) -> String {
+        lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 
     #[test]
     fn test_should_contain_first_level_children() {
@@ -137,9 +168,10 @@ mod tests {
 
         let entry = DirectoryEntry::new(temp_dir.path().to_path_buf(), None, None);
         let preview = entry.get_preview();
-        assert!(preview.contains("test_dir"));
-        assert!(preview.contains("test_file.txt"));
-        assert!(!preview.contains("nested_file.txt"));
+        let preview_str = lines_to_string(&preview);
+        assert!(preview_str.contains("test_dir"));
+        assert!(preview_str.contains("test_file.txt"));
+        assert!(!preview_str.contains("nested_file.txt"));
     }
 
     #[test]
@@ -157,14 +189,13 @@ mod tests {
 
         let entry = DirectoryEntry::new(temp_dir.path().to_path_buf(), None, Some(2));
         let preview = entry.get_preview();
-        assert!(preview.contains("test_dir"));
-        assert!(preview.contains("nested_file.txt"));
+        let preview_str = lines_to_string(&preview);
+        assert!(preview_str.contains("test_dir"));
+        assert!(preview_str.contains("nested_file.txt"));
     }
 
     #[test]
     fn test_tree_layout_formatting() {
-        // Disable color output for assertions
-        colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
 
@@ -184,11 +215,12 @@ mod tests {
 
         let entry = DirectoryEntry::new(root_path.to_path_buf(), None, None);
         let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
         // Verify tree layout
-        assert!(preview.contains("dir1"));
-        assert!(preview.contains("├── file1.txt"));
-        assert!(preview.contains("└── file2.txt"));
-        assert!(preview.contains("dir2"));
+        assert!(preview_str.contains("dir1"));
+        assert!(preview_str.contains("├── file1.txt"));
+        assert!(preview_str.contains("└── file2.txt"));
+        assert!(preview_str.contains("dir2"));
     }
 
     #[test]
@@ -203,11 +235,12 @@ mod tests {
 
         let entry = DirectoryEntry::new(root_path.to_path_buf(), None, None);
         let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
 
-        assert!(preview.contains("visible_file.txt"));
-        assert!(preview.contains("visible_dir"));
-        assert!(!preview.contains(".hidden_file"));
-        assert!(!preview.contains(".hidden_dir"));
+        assert!(preview_str.contains("visible_file.txt"));
+        assert!(preview_str.contains("visible_dir"));
+        assert!(!preview_str.contains(".hidden_file"));
+        assert!(!preview_str.contains(".hidden_dir"));
     }
 
     #[test]
@@ -223,18 +256,17 @@ mod tests {
         // Set max_entries to 5
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(5), None);
         let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
 
         // Should only show 5 entries plus the "..." indicator
-        let lines: Vec<_> = preview.lines().collect();
-        assert_eq!(lines.len(), 6); // 5 files + "..."
-        assert!(preview.contains("..."));
-        assert!(preview.contains("file0.txt"));
-        assert!(!preview.contains("file9.txt")); // Should not contain files beyond the limit
+        assert_eq!(preview.len(), 6); // 5 files + "..."
+        assert!(preview_str.contains("..."));
+        assert!(preview_str.contains("file0.txt"));
+        assert!(!preview_str.contains("file9.txt")); // Should not contain files beyond the limit
     }
 
     #[test]
     fn test_should_limit_entries_in_nested_structure() {
-        colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
 
@@ -256,17 +288,17 @@ mod tests {
         // Set max_entries to 3 and depth to 2
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(3), Some(2));
         let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
 
         // Should show limited entries and "..." in the nested structure
-        assert!(preview.contains("dir1"));
-        assert!(preview.contains("file0.txt"));
-        assert!(preview.contains("..."));
-        assert!(!preview.contains("file4.txt"));
+        assert!(preview_str.contains("dir1"));
+        assert!(preview_str.contains("file0.txt"));
+        assert!(preview_str.contains("..."));
+        assert!(!preview_str.contains("file4.txt"));
     }
 
     #[test]
     fn test_should_limit_entries_with_multiple_directories() {
-        colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
 
@@ -294,6 +326,7 @@ mod tests {
         // Test with max_entries = 4 (should show partial structure)
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(4), Some(2));
         let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
 
         // Should show:
         // dir1
@@ -302,24 +335,20 @@ mod tests {
         // dir2
         // ...
 
-        assert!(preview.contains("dir1"));
-        assert!(preview.contains("file1.txt"));
-        assert!(preview.contains("file2.txt"));
-        assert!(preview.contains("dir2"));
-        assert!(preview.contains("..."));
-        assert!(!preview.contains("dir3"));
-        assert!(!preview.contains("file5.txt"));
+        assert!(preview_str.contains("dir1"));
+        assert!(preview_str.contains("file1.txt"));
+        assert!(preview_str.contains("file2.txt"));
+        assert!(preview_str.contains("dir2"));
+        assert!(preview_str.contains("..."));
+        assert!(!preview_str.contains("dir3"));
+        assert!(!preview_str.contains("file5.txt"));
 
         // Verify the tree structure is maintained
-        let lines: Vec<_> = preview.lines().collect();
-        assert!(lines
-            .iter()
-            .any(|line| line.contains("├──") || line.contains("└──")));
+        assert!(preview_str.contains("├──") || preview_str.contains("└──"));
     }
 
     #[test]
     fn test_should_limit_entries_with_deep_nested_directories() {
-        colored::control::set_override(false);
         let temp_dir = tempdir().unwrap();
         let root_path = temp_dir.path();
 
@@ -350,15 +379,16 @@ mod tests {
         // Test with max_entries = 5
         let entry = DirectoryEntry::new(root_path.to_path_buf(), Some(5), Some(3));
         let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
 
-        assert!(preview.contains("dir1"));
-        assert!(preview.contains("subdir1"));
-        assert!(preview.contains("file1.txt"));
-        assert!(preview.contains("file2.txt"));
-        assert!(preview.contains("dir2"));
-        assert!(preview.contains("..."));
-        assert!(!preview.contains("subdir2"));
-        assert!(!preview.contains("file3.txt"));
-        assert!(!preview.contains("file4.txt"));
+        assert!(preview_str.contains("dir1"));
+        assert!(preview_str.contains("subdir1"));
+        assert!(preview_str.contains("file1.txt"));
+        assert!(preview_str.contains("file2.txt"));
+        assert!(preview_str.contains("dir2"));
+        assert!(preview_str.contains("..."));
+        assert!(!preview_str.contains("subdir2"));
+        assert!(!preview_str.contains("file3.txt"));
+        assert!(!preview_str.contains("file4.txt"));
     }
 }

@@ -2,7 +2,8 @@ use bat::{
     line_range::{LineRange, LineRanges},
     PrettyPrinter,
 };
-use std::{borrow::Cow, fs::read_to_string, path::PathBuf};
+use ratatui::text::Line;
+use std::{fs::read_to_string, path::PathBuf};
 
 use super::Entry;
 
@@ -29,7 +30,9 @@ impl FileEntry {
 }
 
 impl Entry for FileEntry {
-    fn get_preview(&self) -> Cow<'static, str> {
+    fn get_preview(&self) -> Vec<Line<'static>> {
+        use ansi_to_tui::IntoText;
+
         let mut printer = PrettyPrinter::new();
         let mut writer = String::new();
         printer
@@ -49,7 +52,23 @@ impl Entry for FileEntry {
             }
         }
 
-        writer.into()
+        // ANSIエスケープシーケンスをratatuiのLineに変換
+        writer
+            .lines()
+            .map(|line| {
+                let parsed = line.into_text();
+                match parsed {
+                    Ok(text) => {
+                        if text.lines.is_empty() {
+                            Line::from("")
+                        } else {
+                            text.lines.into_iter().next().unwrap_or_default()
+                        }
+                    }
+                    Err(_) => Line::from(line.to_string()),
+                }
+            })
+            .collect()
     }
 }
 
@@ -61,6 +80,20 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
 
+    // Vec<Line>を文字列に変換するヘルパー関数
+    fn lines_to_string(lines: &[Line]) -> String {
+        lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     #[test]
     fn test_get_preview() {
         let temp_dir = tempdir().unwrap();
@@ -68,7 +101,9 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         file.write_all(b"Hello, world!").unwrap();
         let entry = FileEntry::new(file_path, None);
-        assert_eq!(entry.get_preview().contains("Hello, world!"), true);
+        let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
+        assert!(preview_str.contains("Hello, world!"));
     }
 
     #[test]
@@ -83,8 +118,10 @@ mod tests {
         let mut entry = FileEntry::new(file_path, Some(10));
         entry.set_display_lines(5);
         assert_eq!(entry.get_display_lines(), 5);
-        assert_eq!(entry.get_preview().contains("Line 1"), true);
-        assert_eq!(entry.get_preview().contains("Line 5"), true);
-        assert_eq!(entry.get_preview().contains("Line 6"), false);
+        let preview = entry.get_preview();
+        let preview_str = lines_to_string(&preview);
+        assert!(preview_str.contains("Line 1"));
+        assert!(preview_str.contains("Line 5"));
+        assert!(!preview_str.contains("Line 6"));
     }
 }

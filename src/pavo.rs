@@ -4,7 +4,7 @@ use crate::entry::{
 };
 use anyhow::{Context, Result};
 use git2::Repository;
-use std::borrow::Cow;
+use ratatui::text::Line;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -27,7 +27,7 @@ impl Pavo {
         })
     }
 
-    pub fn get_entry_preview(path: &Path) -> Result<Cow<'static, str>> {
+    pub fn get_entry_preview(path: &Path) -> Result<Vec<Line<'static>>> {
         if path.is_dir() {
             if Self::is_git_repo(path) {
                 Ok(RepositoryEntry::new(path.to_path_buf()).get_preview())
@@ -84,6 +84,22 @@ impl Pavo {
         }
         Ok(())
     }
+
+    pub fn toggle_persist(&mut self, path: &Path) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            config_path.persist = !config_path.persist;
+            self.config.save(&self.config_file)?;
+        }
+        Ok(())
+    }
+
+    pub fn set_persist(&mut self, path: &Path, persist: bool) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            config_path.persist = persist;
+            self.config.save(&self.config_file)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -95,6 +111,21 @@ mod tests {
 
     use super::*;
     use crate::test_helper;
+
+    // Vec<Line>を文字列に変換するヘルパー関数
+    #[cfg(test)]
+    fn lines_to_string(lines: &[ratatui::text::Line]) -> String {
+        lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 
     #[cfg(test)]
     fn setup() -> (Pavo, tempfile::TempDir) {
@@ -145,9 +176,8 @@ mod tests {
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(temp_dir.path());
         assert!(result.is_ok());
-        assert!(result
-            .unwrap()
-            .contains(child_file.file_name().unwrap().to_str().unwrap()));
+        let preview_str = lines_to_string(&result.unwrap());
+        assert!(preview_str.contains(child_file.file_name().unwrap().to_str().unwrap()));
     }
 
     #[test]
@@ -159,7 +189,8 @@ mod tests {
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(repo.path());
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Branch"));
+        let preview_str = lines_to_string(&result.unwrap());
+        assert!(preview_str.contains("Branch"));
     }
 
     #[test]
@@ -172,7 +203,8 @@ mod tests {
         assert!(result.is_ok());
         let result = Pavo::get_entry_preview(file.as_path());
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("test content"));
+        let preview_str = lines_to_string(&result.unwrap());
+        assert!(preview_str.contains("test content"));
     }
 
     #[test]
@@ -204,5 +236,89 @@ mod tests {
 
         assert!(result.is_ok());
         assert!(pavo.contains(&temp_dir.path().join("test_dir").canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn test_set_persist_値が設定される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // persistをtrueに設定
+        let result = pavo.set_persist(&canonical_path, true);
+        assert!(result.is_ok());
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(config_path.persist);
+
+        // persistをfalseに設定
+        let result = pavo.set_persist(&canonical_path, false);
+        assert!(result.is_ok());
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(!config_path.persist);
+    }
+
+    #[test]
+    fn test_set_persist_設定ファイルに保存される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+        pavo.set_persist(&canonical_path, true).unwrap();
+
+        // 設定ファイルを読み込んで確認
+        let config_file = pavo.get_config_file();
+        let content = std::fs::read_to_string(config_file).unwrap();
+        assert!(content.contains("persist = true"));
+    }
+
+    #[test]
+    fn test_toggle_persist_値がトグルされる() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // 最初はfalse
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(!config_path.persist);
+
+        // トグルしてtrueに
+        pavo.toggle_persist(&canonical_path).unwrap();
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(config_path.persist);
+
+        // もう一度トグルしてfalseに
+        pavo.toggle_persist(&canonical_path).unwrap();
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert!(!config_path.persist);
     }
 }

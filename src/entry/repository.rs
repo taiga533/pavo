@@ -1,8 +1,11 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use colored::Colorize;
 use git2::{Reference, Repository};
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+};
 
 use crate::entry::{directory::DirectoryEntry, Entry};
 
@@ -11,30 +14,44 @@ pub struct RepositoryEntry {
     repo: Option<Repository>,
 }
 
-pub fn format_latest_commit(commit: &git2::Commit) -> Cow<'static, str> {
-    let mut lines = String::new();
-    lines.push_str(&format!("\n📌 {}\n", "Latest Commit:".yellow()));
-    lines.push_str(&format!("commit {}\n", commit.id()));
-    lines.push_str(&format!("Author: {}\n", commit.author()));
+pub fn format_latest_commit(commit: &git2::Commit) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::raw("📌 "),
+        Span::styled("Latest Commit:", Style::default().fg(Color::Yellow)),
+    ]));
+    lines.push(Line::from(format!("commit {}", commit.id())));
+    lines.push(Line::from(format!("Author: {}", commit.author())));
     if let Some(msg) = commit.message() {
         if let Some(first_line) = msg.lines().next() {
-            lines.push_str(&format!("\n    {}\n", first_line.bold()));
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(
+                    first_line.to_string(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+            ]));
         }
     }
-    lines.push('\n');
-    lines.into()
+    lines.push(Line::from(""));
+
+    lines
 }
 
-pub fn format_branch_info(head: &Reference) -> Cow<'static, str> {
-    let mut preview = String::new();
+pub fn format_branch_info(head: &Reference) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
     if let Some(branch_name) = head.shorthand() {
-        preview.push_str(&format!(
-            "🌿 {}: {}\n",
-            "Branch".blue(),
-            branch_name.green()
-        ));
+        lines.push(Line::from(vec![
+            Span::raw("🌿 "),
+            Span::styled("Branch", Style::default().fg(Color::Blue)),
+            Span::raw(": "),
+            Span::styled(branch_name.to_string(), Style::default().fg(Color::Green)),
+        ]));
     }
-    preview.into()
+    lines
 }
 
 impl RepositoryEntry {
@@ -47,7 +64,7 @@ impl RepositoryEntry {
         Self { path, repo }
     }
 
-    fn generate_branch_info(&self) -> Result<Cow<'static, str>> {
+    fn generate_branch_info(&self) -> Result<Vec<Line<'static>>> {
         if let Some(repo) = &self.repo {
             let head = repo.head().with_context(|| "Failed to get head")?;
             Ok(format_branch_info(&head))
@@ -56,7 +73,7 @@ impl RepositoryEntry {
         }
     }
 
-    fn generate_latest_commit_info(&self) -> Result<Cow<'static, str>> {
+    fn generate_latest_commit_info(&self) -> Result<Vec<Line<'static>>> {
         if let Some(repo) = &self.repo {
             let head = repo.head().with_context(|| "Failed to get head")?;
             let commit = head
@@ -70,22 +87,22 @@ impl RepositoryEntry {
 }
 
 impl Entry for RepositoryEntry {
-    fn get_preview(&self) -> Cow<'static, str> {
-        let mut preview = String::new();
+    fn get_preview(&self) -> Vec<Line<'static>> {
+        let mut preview = Vec::new();
 
         // Add git repository information
         if let Ok(branch_info) = self.generate_branch_info() {
-            preview.push_str(&branch_info);
+            preview.extend(branch_info);
         }
         if let Ok(latest_commit_info) = self.generate_latest_commit_info() {
-            preview.push_str(&latest_commit_info);
+            preview.extend(latest_commit_info);
         }
 
         // Add directory information
         let dir_preview = DirectoryEntry::new(self.path.clone(), None, None).get_preview();
-        preview.push_str(&dir_preview);
+        preview.extend(dir_preview);
 
-        preview.into()
+        preview
     }
 }
 
@@ -96,27 +113,41 @@ mod tests {
     use super::*;
     use crate::test_helper::setup_test_repo;
 
+    // Vec<Line>を文字列に変換するヘルパー関数
+    fn lines_to_string(lines: &[Line]) -> String {
+        lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     #[test]
     fn test_repository_entry_branch_info() {
-        colored::control::set_override(false);
         let dir = TempDir::new().unwrap();
         setup_test_repo(&dir);
         let entry = RepositoryEntry::new(dir.path().to_path_buf());
         let preview = entry.get_preview();
-        assert!(preview.contains("Branch: main"));
-        assert!(preview.contains("test.txt")); // Directory preview
+        let preview_str = lines_to_string(&preview);
+        assert!(preview_str.contains("Branch: main"));
+        assert!(preview_str.contains("test.txt")); // Directory preview
     }
 
     #[test]
     fn test_repository_entry_commit_info() {
-        colored::control::set_override(false);
         let dir = TempDir::new().unwrap();
         setup_test_repo(&dir);
         let entry = RepositoryEntry::new(dir.path().to_path_buf());
         let preview = entry.get_preview();
-        assert!(preview.contains("Latest Commit:"));
-        assert!(preview.contains("Initial commit"));
-        assert!(preview.contains("Author: Test User <test@example.com>"));
-        assert!(preview.contains("test.txt")); // Directory preview
+        let preview_str = lines_to_string(&preview);
+        assert!(preview_str.contains("Latest Commit:"));
+        assert!(preview_str.contains("Initial commit"));
+        assert!(preview_str.contains("Author: Test User <test@example.com>"));
+        assert!(preview_str.contains("test.txt")); // Directory preview
     }
 }

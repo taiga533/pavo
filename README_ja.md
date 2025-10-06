@@ -10,17 +10,15 @@ pavo（favorite + path）は、編集したいファイルやディレクトリ�
 ### Linux
 
 ```bash
-VERSION='v0.1.1'
-curl -L "https://github.com/taiga533/pavo/releases/download/${VERSION}/pavo-x86_64-unknown-linux-gnu.tar.gz" \
-| tar xz -C /usr/local/bin
+curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-x86_64-unknown-linux-gnu.tar.gz" \
+| tar xz -C ~/.local/bin
 ```
 
 ### MacOS（Apple Silicon のみ）
 
 ```bash
-VERSION='v0.1.1'
-curl -L "https://github.com/taiga533/pavo/releases/download/${VERSION}/pavo-aarch64-apple-darwin.tar.gz" \
-| tar xz -C /usr/local/bin
+curl -L "https://github.com/taiga533/pavo/releases/latest/download/pavo-aarch64-apple-darwin.tar.gz" \
+| tar xz -C ~/.local/bin
 ```
 
 インストール後、`cd`コマンドなどでブックマークしたパスへ簡単に移動できるように下記の[シェル統合](#シェル統合)セクションを参考に設定を行うことをお勧めします。
@@ -67,12 +65,16 @@ max_unselected_time = 604800 # 7日 (単位: 秒)
 
 ## シェル統合
 
+`p` コマンドを使用してブックマークしたパスへ簡単に移動できるようにシェル統合を設定できます。`p` コマンドは、選択したパスがディレクトリの場合は移動し、ファイルの場合はパスを出力します。
+
 ### Bash と Zsh
 
 以下の行を `~/.bashrc` または `~/.zshrc` に追加してください：
 
 ```bash
-alias cdp='cd "$(pavo)"'
+eval "$(pavo init bash)"
+# または zsh の場合
+eval "$(pavo init zsh)"
 ```
 
 ### Fish
@@ -80,5 +82,11 @@ alias cdp='cd "$(pavo)"'
 以下の行を `~/.config/fish/config.fish` に追加してください：
 
 ```fish
-alias cdp='cd (pavo)'
+pavo init fish | source
+```
+
+シェル統合を設定した後、`p` コマンドで移動できます：
+
+```bash
+p  # TUI を開いてブックマークしたパスを選択し、移動します
 ```
