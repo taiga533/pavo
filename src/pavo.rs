@@ -39,7 +39,7 @@ impl Pavo {
         }
     }
 
-    fn is_git_repo(dir: &Path) -> bool {
+    pub fn is_git_repo(dir: &Path) -> bool {
         Repository::open(dir).is_ok()
     }
 

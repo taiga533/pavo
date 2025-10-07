@@ -14,20 +14,23 @@ mod tests {
 
     #[test]
     fn test_add_command_with_specified_directory_succeeds() {
-        let _temp_dir = setup();
+        let _temp_config_dir = setup();
+        let temp_target_dir = tempfile::tempdir().unwrap();
         Command::cargo_bin("pavo")
             .unwrap()
             .arg("add")
-            .arg(".")
+            .arg(temp_target_dir.path())
             .assert()
             .success();
     }
 
     #[test]
     fn test_add_command_without_directory_succeeds() {
-        let _temp_dir = setup();
+        let _temp_config_dir = setup();
+        let temp_target_dir = tempfile::tempdir().unwrap();
         Command::cargo_bin("pavo")
             .unwrap()
+            .current_dir(temp_target_dir.path())
             .arg("add")
             .assert()
             .success();

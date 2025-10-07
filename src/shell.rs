@@ -47,6 +47,26 @@ p() {
         fi
     fi
 }
+
+# Auto-record git repositories on directory change
+_pavo_record_hook() {
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        pavo add 2>/dev/null
+    fi
+}
+
+# Hook for bash
+if [ -n "$BASH_VERSION" ]; then
+    if [[ "$PROMPT_COMMAND" != *"_pavo_record_hook"* ]]; then
+        PROMPT_COMMAND="_pavo_record_hook${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+    fi
+fi
+
+# Hook for zsh
+if [ -n "$ZSH_VERSION" ]; then
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd _pavo_record_hook
+fi
 "#
     .to_string()
 }
@@ -72,6 +92,13 @@ function p
         else
             echo $result
         end
+    end
+end
+
+# Auto-record git repositories on directory change
+function _pavo_record_hook --on-variable PWD
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1
+        pavo add 2>/dev/null
     end
 end
 "#
@@ -131,5 +158,32 @@ mod tests {
         let script = generate_init_script("fish").unwrap();
         assert!(script.contains("pavo init fish | source"));
         assert!(script.contains("~/.config/fish/config.fish"));
+    }
+
+    #[test]
+    fn test_bashスクリプトに自動記録フックが含まれること() {
+        let script = generate_init_script("bash").unwrap();
+        assert!(script.contains("_pavo_record_hook"));
+        assert!(script.contains("pavo add"));
+        assert!(script.contains("git rev-parse --is-inside-work-tree"));
+        assert!(script.contains("PROMPT_COMMAND"));
+    }
+
+    #[test]
+    fn test_zshスクリプトに自動記録フックが含まれること() {
+        let script = generate_init_script("zsh").unwrap();
+        assert!(script.contains("_pavo_record_hook"));
+        assert!(script.contains("pavo add"));
+        assert!(script.contains("git rev-parse --is-inside-work-tree"));
+        assert!(script.contains("add-zsh-hook precmd"));
+    }
+
+    #[test]
+    fn test_fishスクリプトに自動記録フックが含まれること() {
+        let script = generate_init_script("fish").unwrap();
+        assert!(script.contains("_pavo_record_hook"));
+        assert!(script.contains("pavo add"));
+        assert!(script.contains("git rev-parse --is-inside-work-tree"));
+        assert!(script.contains("--on-variable PWD"));
     }
 }
