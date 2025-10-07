@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub mod cli;
 pub mod config;
 pub mod entry;
+pub mod path_display;
 pub mod pavo;
 pub mod shell;
 #[cfg(test)]

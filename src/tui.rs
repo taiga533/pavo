@@ -16,6 +16,7 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
+use crate::path_display;
 use crate::Pavo;
 
 /// フォーカス中のパネル
@@ -66,6 +67,8 @@ impl ModalFocus {
 pub struct App {
     /// パスのリスト
     paths: Vec<PathBuf>,
+    /// 表示用の短縮パスのリスト
+    display_paths: Vec<String>,
     /// フィルタリング後のパスのインデックス
     filtered_indices: Vec<usize>,
     /// 選択中のアイテムのインデックス
@@ -109,6 +112,7 @@ impl App {
     /// * `tag_filter` - タグフィルター
     pub fn new(paths: Vec<PathBuf>, tag_filter: Option<String>) -> Self {
         let filtered_indices: Vec<usize> = (0..paths.len()).collect();
+        let display_paths = path_display::compute_display_paths(&paths);
         let preview = if !paths.is_empty() {
             Pavo::get_entry_preview(&paths[0]).unwrap_or_default()
         } else {
@@ -117,6 +121,7 @@ impl App {
 
         Self {
             paths,
+            display_paths,
             filtered_indices,
             selected: 0,
             input: String::new(),
@@ -470,6 +475,7 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
         .iter()
         .map(|&idx| {
             let path = &app.paths[idx];
+            let display_path = &app.display_paths[idx];
             let config_path = config_paths.iter().find(|cp| cp.path == *path);
             let persist_mark = config_path
                 .map(|cp| if cp.persist { " [P]" } else { "" })
@@ -483,12 +489,7 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
                     }
                 })
                 .unwrap_or_default();
-            ListItem::new(format!(
-                "{}{}{}",
-                path.display(),
-                persist_mark,
-                tags_display
-            ))
+            ListItem::new(format!("{}{}{}", display_path, persist_mark, tags_display))
         })
         .collect();
 
