@@ -17,7 +17,10 @@ pub fn run() -> anyhow::Result<()> {
         .map(PathBuf::from)
         .ok();
     let mut pavo = Pavo::new(config_dir)?;
-    match cli::Cli::parse().command {
+    let cli = cli::Cli::parse();
+    let tag_filter = cli.tag.clone();
+
+    match cli.command {
         Some(cli::Commands::Add { dir, persist }) => match dir {
             Some(d) => pavo.add_path(&d, persist),
             None => pavo.add_path(std::env::current_dir()?.to_str().unwrap(), persist),
@@ -45,7 +48,7 @@ pub fn run() -> anyhow::Result<()> {
         }
         None => {
             pavo.clean()?;
-            tui::run_tui(&mut pavo)
+            tui::run_tui(&mut pavo, tag_filter.as_deref())
         }
     }
 }

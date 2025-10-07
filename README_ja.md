@@ -36,6 +36,14 @@ pavo add --persist
 pavo add -p
 ```
 
+### タグで絞り込む
+
+```bash
+# TUIでタグでフィルタリングされたパスを表示
+pavo --tag work
+pavo -t rust
+```
+
 ### ブックマークを削除する
 
 ```bash
@@ -58,10 +66,21 @@ pavo config
 auto_clean = true # 一定期間参照されていないブックマークを自動で削除するかどうか
 max_unselected_time = 604800 # 7日 (単位: 秒)
 
-[paths]
-# ブックマークするパス
-"~/path/to/bookmark" = { persist = true, last_selected = "2025-01-01T00:00:00Z" }
+[[paths]]
+path = "/path/to/bookmark"
+persist = true
+last_selected = "2025-01-01T00:00:00Z"
+tags = ["work", "rust"]  # タグのリスト（カンマ区切り）
 ```
+
+### タグの管理
+
+TUIモード（`pavo`コマンドを引数なしで実行）で、Pathsパネルにフォーカスを合わせ、Enterキーを押すとパス設定モーダルが開きます。ここでタグを編集できます。
+
+- タグはカンマ区切りで入力します（例: `work, rust, cli`）
+- タグ名には任意の文字が使用可能です（空白は自動的にトリミングされます）
+- Tabキーでフィールド間を移動できます
+- Enterで保存、Escでキャンセル（変更を破棄）してモーダルを閉じます
 
 ## シェル統合
 
@@ -88,5 +107,7 @@ pavo init fish | source
 シェル統合を設定した後、`p` コマンドで移動できます：
 
 ```bash
-p  # TUI を開いてブックマークしたパスを選択し、移動します
+p               # TUI を開いてブックマークしたパスを選択し、移動します
+p --tag work    # "work"タグが付いたパスから選択
+p -t rust       # "rust"タグが付いたパスから選択
 ```

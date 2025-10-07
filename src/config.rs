@@ -4,13 +4,15 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfigPath {
     pub path: PathBuf,
     #[serde(default = "chrono::Utc::now")]
     pub last_selected: chrono::DateTime<chrono::Utc>,
     #[serde(default)]
     pub persist: bool,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -73,6 +75,7 @@ impl Config {
             path,
             last_selected: chrono::Utc::now(),
             persist,
+            tags: Vec::new(),
         });
         Ok(())
     }

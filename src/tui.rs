@@ -46,6 +46,22 @@ impl FocusedPanel {
     }
 }
 
+/// モーダル内のフォーカス
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ModalFocus {
+    Persist,
+    Tags,
+}
+
+impl ModalFocus {
+    fn next(self) -> Self {
+        match self {
+            Self::Persist => Self::Tags,
+            Self::Tags => Self::Persist,
+        }
+    }
+}
+
 /// TUIアプリケーションの状態を管理する構造体
 pub struct App {
     /// パスのリスト
@@ -72,6 +88,17 @@ pub struct App {
     show_modal: bool,
     /// モーダル内で選択中のpersist値
     modal_persist_value: bool,
+    /// モーダル内で編集中のタグリスト
+    modal_tags_input: String,
+    /// タグフィルター
+    #[allow(dead_code)]
+    tag_filter: Option<String>,
+    /// モーダル内のフォーカス
+    modal_focus: ModalFocus,
+    /// モーダルを開いた時の元のpersist値
+    modal_original_persist: bool,
+    /// モーダルを開いた時の元のタグ
+    modal_original_tags: String,
 }
 
 impl App {
@@ -79,7 +106,8 @@ impl App {
     ///
     /// # Arguments
     /// * `paths` - パスのリスト
-    pub fn new(paths: Vec<PathBuf>) -> Self {
+    /// * `tag_filter` - タグフィルター
+    pub fn new(paths: Vec<PathBuf>, tag_filter: Option<String>) -> Self {
         let filtered_indices: Vec<usize> = (0..paths.len()).collect();
         let preview = if !paths.is_empty() {
             Pavo::get_entry_preview(&paths[0]).unwrap_or_default()
@@ -100,6 +128,11 @@ impl App {
             focused_panel: FocusedPanel::Search,
             show_modal: false,
             modal_persist_value: false,
+            modal_tags_input: String::new(),
+            tag_filter,
+            modal_focus: ModalFocus::Persist,
+            modal_original_persist: false,
+            modal_original_tags: String::new(),
         }
     }
 
@@ -216,12 +249,18 @@ impl App {
     fn open_modal(&mut self, pavo: &Pavo) {
         if let Some(&idx) = self.filtered_indices.get(self.selected) {
             let path = &self.paths[idx];
-            self.modal_persist_value = pavo
-                .get_paths()
-                .iter()
-                .find(|cp| cp.path == *path)
-                .map(|cp| cp.persist)
-                .unwrap_or(false);
+            if let Some(config_path) = pavo.get_paths().iter().find(|cp| cp.path == *path) {
+                self.modal_persist_value = config_path.persist;
+                self.modal_tags_input = config_path.tags.join(", ");
+                // 元の値を保存
+                self.modal_original_persist = config_path.persist;
+                self.modal_original_tags = self.modal_tags_input.clone();
+            } else {
+                self.modal_persist_value = false;
+                self.modal_tags_input = String::new();
+                self.modal_original_persist = false;
+                self.modal_original_tags = String::new();
+            }
             self.show_modal = true;
         }
     }
@@ -237,12 +276,39 @@ impl App {
     }
 
     /// モーダルの変更を確定する
-    fn confirm_modal(&mut self) -> Option<(usize, bool)> {
+    fn confirm_modal(&mut self) -> Option<(usize, bool, Vec<String>)> {
         if let Some(&idx) = self.filtered_indices.get(self.selected) {
-            Some((idx, self.modal_persist_value))
+            let tags: Vec<String> = self
+                .modal_tags_input
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            Some((idx, self.modal_persist_value, tags))
         } else {
             None
         }
+    }
+
+    /// モーダルのタグ入力に文字を追加する
+    fn add_char_to_modal_tags(&mut self, c: char) {
+        self.modal_tags_input.push(c);
+    }
+
+    /// モーダルのタグ入力から最後の文字を削除する
+    fn delete_char_from_modal_tags(&mut self) {
+        self.modal_tags_input.pop();
+    }
+
+    /// モーダル内で次のフィールドにフォーカスを移動する
+    fn modal_focus_next(&mut self) {
+        self.modal_focus = self.modal_focus.next();
+    }
+
+    /// モーダルをキャンセルする（変更を破棄）
+    fn cancel_modal(&mut self) {
+        self.modal_persist_value = self.modal_original_persist;
+        self.modal_tags_input = self.modal_original_tags.clone();
     }
 }
 
@@ -257,15 +323,35 @@ fn handle_event(app: &mut App, pavo: &mut Pavo) -> Result<()> {
             // モーダルが開いている場合の処理
             if app.show_modal {
                 match key.code {
-                    KeyCode::Enter | KeyCode::Esc => {
-                        if let Some((idx, new_persist)) = app.confirm_modal() {
+                    KeyCode::Enter => {
+                        if let Some((idx, new_persist, new_tags)) = app.confirm_modal() {
                             let path = &app.paths[idx];
                             pavo.set_persist(path, new_persist)?;
+                            pavo.set_tags(path, new_tags)?;
                         }
                         app.close_modal();
                     }
+                    KeyCode::Esc => {
+                        app.cancel_modal();
+                        app.close_modal();
+                    }
+                    KeyCode::Tab => {
+                        app.modal_focus_next();
+                    }
                     KeyCode::Up | KeyCode::Down | KeyCode::Char(' ') => {
-                        app.toggle_modal_persist();
+                        if app.modal_focus == ModalFocus::Persist {
+                            app.toggle_modal_persist();
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        if app.modal_focus == ModalFocus::Tags {
+                            app.delete_char_from_modal_tags();
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        if app.modal_focus == ModalFocus::Tags {
+                            app.add_char_to_modal_tags(c);
+                        }
                     }
                     _ => {}
                 }
@@ -384,12 +470,25 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
         .iter()
         .map(|&idx| {
             let path = &app.paths[idx];
-            let persist_mark = config_paths
-                .iter()
-                .find(|cp| cp.path == *path)
+            let config_path = config_paths.iter().find(|cp| cp.path == *path);
+            let persist_mark = config_path
                 .map(|cp| if cp.persist { " [P]" } else { "" })
                 .unwrap_or("");
-            ListItem::new(format!("{}{}", path.display(), persist_mark))
+            let tags_display = config_path
+                .map(|cp| {
+                    if cp.tags.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" [{}]", cp.tags.join(", "))
+                    }
+                })
+                .unwrap_or_default();
+            ListItem::new(format!(
+                "{}{}{}",
+                path.display(),
+                persist_mark,
+                tags_display
+            ))
         })
         .collect();
 
@@ -467,8 +566,8 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
 
     // 中央にモーダルを配置
     let area = f.area();
-    let modal_width = 60;
-    let modal_height = 7;
+    let modal_width = 70;
+    let modal_height = 10;
     let modal_area = Rect {
         x: (area.width.saturating_sub(modal_width)) / 2,
         y: (area.height.saturating_sub(modal_height)) / 2,
@@ -486,17 +585,31 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
         String::new()
     };
 
-    let checkbox = if app.modal_persist_value {
+    let persist_checkbox = if app.modal_persist_value {
         "[x]"
     } else {
         "[ ]"
     };
 
+    let persist_indicator = if app.modal_focus == ModalFocus::Persist {
+        ">"
+    } else {
+        " "
+    };
+
+    let tags_indicator = if app.modal_focus == ModalFocus::Tags {
+        ">"
+    } else {
+        " "
+    };
+
     let modal_text = format!(
         "Path: {}\n\n\
-         {} Persist\n\n\
-         [↑/↓/Space] Toggle  [Enter/Esc] Close",
-        path_display, checkbox
+         {} {} Persist\n\
+         {} Tags: {}\n\n\
+         [Tab] Switch field  [↑/↓/Space] Toggle (Persist)\n\
+         [Enter] Save  [Esc] Cancel",
+        path_display, persist_indicator, persist_checkbox, tags_indicator, app.modal_tags_input
     );
 
     let modal_block = Block::default()
@@ -520,7 +633,8 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
 ///
 /// # Arguments
 /// * `pavo` - Pavoインスタンス
-pub fn run_tui(pavo: &mut Pavo) -> Result<()> {
+/// * `tag_filter` - タグフィルター
+pub fn run_tui(pavo: &mut Pavo, tag_filter: Option<&str>) -> Result<()> {
     // ターミナルのセットアップ
     enable_raw_mode().context("Failed to enable raw mode")?;
     let mut tty = std::fs::OpenOptions::new()
@@ -533,12 +647,18 @@ pub fn run_tui(pavo: &mut Pavo) -> Result<()> {
     let mut terminal = Terminal::new(backend).context("Failed to create terminal")?;
 
     // アプリケーションの実行
-    let paths: Vec<PathBuf> = pavo
-        .get_paths()
-        .iter()
-        .map(|config_path| config_path.path.clone())
-        .collect();
-    let mut app = App::new(paths);
+    let paths: Vec<PathBuf> = if let Some(tag) = tag_filter {
+        pavo.get_paths_by_tag(tag)
+            .iter()
+            .map(|config_path| config_path.path.clone())
+            .collect()
+    } else {
+        pavo.get_paths()
+            .iter()
+            .map(|config_path| config_path.path.clone())
+            .collect()
+    };
+    let mut app = App::new(paths, tag_filter.map(|s| s.to_string()));
 
     loop {
         terminal.draw(|f| ui(f, &app, pavo))?;
@@ -586,7 +706,7 @@ mod tests {
     #[test]
     fn test_app_new_空のパスリストで初期化される() {
         // Arrange & Act
-        let app = App::new(vec![]);
+        let app = App::new(vec![], None);
 
         // Assert
         assert_eq!(app.paths.len(), 0);
@@ -604,7 +724,7 @@ mod tests {
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
 
         // Act
-        let app = App::new(paths.clone());
+        let app = App::new(paths.clone(), None);
 
         // Assert
         assert_eq!(app.paths.len(), 2);
@@ -621,7 +741,7 @@ mod tests {
             temp_dir.path().join("test2"),
             temp_dir.path().join("test3"),
         ];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act
         app.select_next();
@@ -635,7 +755,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.selected = 1;
 
         // Act
@@ -650,7 +770,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.selected = 1;
 
         // Act
@@ -665,7 +785,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act
         app.select_previous();
@@ -679,7 +799,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act
         app.add_char('t');
@@ -694,7 +814,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.input = "test".to_string();
 
         // Act
@@ -713,7 +833,7 @@ mod tests {
             temp_dir.path().join("test2"),
             temp_dir.path().join("other"),
         ];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act
         app.input = "test".to_string();
@@ -730,7 +850,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act
         app.input = "".to_string();
@@ -745,7 +865,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths.clone());
+        let mut app = App::new(paths.clone(), None);
         app.selected = 1;
 
         // Act
@@ -761,7 +881,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act
         app.quit();
@@ -775,7 +895,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act & Assert
         assert_eq!(app.focused_panel, FocusedPanel::Search);
@@ -792,7 +912,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         // Act & Assert
         assert_eq!(app.focused_panel, FocusedPanel::Search);
@@ -809,7 +929,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.preview_scroll = 5;
 
         // Act
@@ -824,7 +944,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.preview_scroll = 0;
 
         // Act
@@ -839,7 +959,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.preview_scroll = 5;
 
         // Act
@@ -854,7 +974,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.modal_persist_value = false;
 
         // Act
@@ -877,7 +997,7 @@ mod tests {
         let test_path = temp_dir.path().join("test1");
         let canonical_path = test_path.canonicalize().unwrap();
         let paths = vec![canonical_path.clone()];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
 
         let config_dir = tempfile::tempdir().unwrap();
         let mut pavo = crate::Pavo::new(Some(config_dir.path().to_path_buf())).unwrap();
@@ -896,7 +1016,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.show_modal = true;
 
         // Act
@@ -911,7 +1031,7 @@ mod tests {
         // Arrange
         let temp_dir = create_test_env();
         let paths = vec![temp_dir.path().join("test1"), temp_dir.path().join("test2")];
-        let mut app = App::new(paths);
+        let mut app = App::new(paths, None);
         app.selected = 1;
         app.modal_persist_value = true;
 
@@ -920,8 +1040,162 @@ mod tests {
 
         // Assert
         assert!(result.is_some());
-        let (idx, persist) = result.unwrap();
+        let (idx, persist, _tags) = result.unwrap();
         assert_eq!(idx, 1);
         assert!(persist);
+    }
+
+    #[test]
+    fn test_add_char_to_modal_tags_タグ入力に文字が追加される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+
+        // Act
+        app.add_char_to_modal_tags('w');
+        app.add_char_to_modal_tags('o');
+        app.add_char_to_modal_tags('r');
+        app.add_char_to_modal_tags('k');
+
+        // Assert
+        assert_eq!(app.modal_tags_input, "work");
+    }
+
+    #[test]
+    fn test_delete_char_from_modal_tags_タグ入力から文字が削除される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+        app.modal_tags_input = "work".to_string();
+
+        // Act
+        app.delete_char_from_modal_tags();
+
+        // Assert
+        assert_eq!(app.modal_tags_input, "wor");
+    }
+
+    #[test]
+    fn test_confirm_modal_タグがパースされる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+        app.modal_tags_input = "work, rust, cli".to_string();
+
+        // Act
+        let result = app.confirm_modal();
+
+        // Assert
+        assert!(result.is_some());
+        let (_idx, _persist, tags) = result.unwrap();
+        assert_eq!(tags, vec!["work", "rust", "cli"]);
+    }
+
+    #[test]
+    fn test_confirm_modal_空白がトリミングされる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+        app.modal_tags_input = "  work  ,  rust  , cli ".to_string();
+
+        // Act
+        let result = app.confirm_modal();
+
+        // Assert
+        assert!(result.is_some());
+        let (_idx, _persist, tags) = result.unwrap();
+        assert_eq!(tags, vec!["work", "rust", "cli"]);
+    }
+
+    #[test]
+    fn test_confirm_modal_空のタグは除外される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+        app.modal_tags_input = "work, , rust, , cli".to_string();
+
+        // Act
+        let result = app.confirm_modal();
+
+        // Assert
+        assert!(result.is_some());
+        let (_idx, _persist, tags) = result.unwrap();
+        assert_eq!(tags, vec!["work", "rust", "cli"]);
+    }
+
+    #[test]
+    fn test_modal_focus_next_フォーカスが切り替わる() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+        assert_eq!(app.modal_focus, ModalFocus::Persist);
+
+        // Act
+        app.modal_focus_next();
+
+        // Assert
+        assert_eq!(app.modal_focus, ModalFocus::Tags);
+
+        // Act
+        app.modal_focus_next();
+
+        // Assert
+        assert_eq!(app.modal_focus, ModalFocus::Persist);
+    }
+
+    #[test]
+    fn test_cancel_modal_変更が破棄される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+
+        // 元の値を設定
+        app.modal_original_persist = false;
+        app.modal_original_tags = "original".to_string();
+
+        // 値を変更
+        app.modal_persist_value = true;
+        app.modal_tags_input = "modified".to_string();
+
+        // Act
+        app.cancel_modal();
+
+        // Assert
+        assert_eq!(app.modal_persist_value, false);
+        assert_eq!(app.modal_tags_input, "original");
+    }
+
+    #[test]
+    fn test_open_modal_元の値が保存される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let test_path = temp_dir.path().join("test1");
+        let canonical_path = test_path.canonicalize().unwrap();
+        let paths = vec![canonical_path.clone()];
+        let mut app = App::new(paths, None);
+
+        let config_dir = tempfile::tempdir().unwrap();
+        let mut pavo = crate::Pavo::new(Some(config_dir.path().to_path_buf())).unwrap();
+        pavo.add_path(test_path.to_str().unwrap(), true).unwrap();
+        pavo.set_tags(
+            &canonical_path,
+            vec!["work".to_string(), "rust".to_string()],
+        )
+        .unwrap();
+
+        // Act
+        app.open_modal(&pavo);
+
+        // Assert
+        assert!(app.show_modal);
+        assert_eq!(app.modal_original_persist, true);
+        assert_eq!(app.modal_original_tags, "work, rust");
     }
 }

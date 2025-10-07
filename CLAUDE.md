@@ -57,6 +57,7 @@ max_unselected_time = 604800  # 7日間（秒）
 path = "/path/to/bookmark"
 persist = true
 last_selected = "2025-01-01T00:00:00Z"
+tags = ["work", "rust"]  # タグのリスト
 ```
 
 ### パス管理の仕組み
@@ -65,16 +66,55 @@ last_selected = "2025-01-01T00:00:00Z"
 2. `persist = true` のパスは、存在しなくなっても `clean` コマンドで削除されない
 3. `auto_clean = true` の場合、`max_unselected_time` を超えたパスは自動削除される
 4. 選択時に `last_selected` が更新される
+5. 各パスには複数のタグを付与でき、タグで絞り込んで表示できる
 
 ### UI操作
 
-TUIモード（引数なしで実行）での操作:
+#### TUIモード（引数なしで実行）での操作:
+
+**メイン画面:**
 - `Ctrl-N` / `Down`: 次のアイテムを選択
 - `Ctrl-P` / `Up`: 前のアイテムを選択
-- `Enter`: 選択したパスを確定して出力
+- `Enter`:
+  - Searchパネル: 選択したパスを確定して出力
+  - Pathsパネル: パス設定モーダルを開く
+- `Tab`: 次のパネルにフォーカスを移動 (Search → Paths → Preview → Search)
+- `Shift-Tab`: 前のパネルにフォーカスを移動
 - `Ctrl-C` / `Esc`: 終了
-- `Backspace`: 検索クエリの最後の文字を削除
-- 文字入力: ファジー検索クエリに追加
+- `Backspace`: (Searchパネル) 検索クエリの最後の文字を削除
+- 文字入力: (Searchパネル) ファジー検索クエリに追加
+
+**パス設定モーダル:**
+- `Tab`: フィールドを切り替え (Persist ↔ Tags)
+- `↑` / `↓` / `Space`: (Persistフィールド) チェックボックスをトグル
+- `文字入力`: (Tagsフィールド) タグを入力 (カンマ区切り)
+  - タグ名には任意の文字が使用可能（空白は自動的にトリミングされる）
+- `Backspace`: (Tagsフィールド) 最後の文字を削除
+- `Enter`: 変更を保存してモーダルを閉じる
+- `Esc`: 変更を破棄してモーダルを閉じる
+
+#### コマンドラインオプション:
+
+- `pavo --tag <TAG>` or `pavo -t <TAG>`: 指定したタグでパスを絞り込む
+- `pavo add [DIR] [--persist]`: パスを追加
+- `pavo clean`: 存在しないパスを削除
+- `pavo config`: 設定ファイルをエディタで開く
+- `pavo init <shell>`: シェル統合スクリプトを生成 (bash/zsh/fish)
+
+#### シェル統合:
+
+```bash
+# bash/zshの場合
+eval "$(pavo init bash)"  # または zsh
+
+# fishの場合
+pavo init fish | source
+
+# 使い方
+p                 # TUIを開いて選択したパスに移動
+p --tag work      # "work"タグが付いたパスから選択
+p -t rust         # "rust"タグが付いたパスから選択
+```
 
 ## リリースプロセス
 

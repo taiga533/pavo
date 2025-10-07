@@ -23,7 +23,22 @@ fn generate_bash_zsh_script() -> String {
 
 p() {
     local result
-    result=$(pavo </dev/tty)
+    local tag_arg=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -t|--tag)
+                tag_arg="--tag $2"
+                shift 2
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    result=$(pavo $tag_arg </dev/tty)
     if [ $? -eq 0 ] && [ -n "$result" ]; then
         if [ -d "$result" ]; then
             cd "$result" || return
@@ -42,7 +57,15 @@ fn generate_fish_script() -> String {
 # pavo init fish | source
 
 function p
-    set -l result (pavo </dev/tty)
+    set -l tag_arg ""
+
+    # Parse options
+    argparse 't/tag=' -- $argv
+    if set -q _flag_tag
+        set tag_arg "--tag $_flag_tag"
+    end
+
+    set -l result (pavo $tag_arg </dev/tty)
     if test $status -eq 0 -a -n "$result"
         if test -d "$result"
             cd $result
