@@ -13,6 +13,8 @@ pub struct ConfigPath {
     pub persist: bool,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub access_count: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -76,6 +78,7 @@ impl Config {
             last_selected: chrono::Utc::now(),
             persist,
             tags: Vec::new(),
+            access_count: 0,
         });
         Ok(())
     }
@@ -271,5 +274,41 @@ mod tests {
         let loaded_config: Config = toml::from_str(&content).unwrap();
         assert_eq!(loaded_config.paths.len(), 1);
         assert_eq!(loaded_config.paths[0].path, test_dir.path());
+    }
+
+    #[test]
+    fn test_access_count_デフォルト値が0である() {
+        // Arrange
+        let mut config = Config::default();
+        let temp_dir = tempdir().unwrap();
+
+        // Act
+        config
+            .add_path(temp_dir.path().to_path_buf(), false)
+            .unwrap();
+
+        // Assert
+        assert_eq!(config.paths[0].access_count, 0);
+    }
+
+    #[test]
+    fn test_access_count_シリアライズとデシリアライズができる() {
+        // Arrange
+        let temp_dir = tempdir().unwrap();
+        let config_file = temp_dir.path().join("test_config.toml");
+        let mut config = Config::default();
+        let test_dir = tempdir().unwrap();
+
+        // Act
+        config
+            .add_path(test_dir.path().to_path_buf(), false)
+            .unwrap();
+        config.paths[0].access_count = 42;
+        config.save(&config_file).unwrap();
+
+        // Assert
+        let content = fs::read_to_string(&config_file).unwrap();
+        let loaded_config: Config = toml::from_str(&content).unwrap();
+        assert_eq!(loaded_config.paths[0].access_count, 42);
     }
 }

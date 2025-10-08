@@ -89,6 +89,7 @@ impl Pavo {
     pub fn update_last_selected(&mut self, path: &Path) -> Result<()> {
         if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
             config_path.last_selected = chrono::Utc::now();
+            config_path.access_count += 1;
             self.config.save(&self.config_file)?;
         }
         Ok(())
@@ -491,5 +492,46 @@ mod tests {
         let personal_paths = pavo.get_paths_by_tag("personal");
         assert_eq!(personal_paths.len(), 1);
         assert_eq!(personal_paths[0].path, canonical_path3);
+    }
+
+    #[test]
+    fn test_update_last_selected_access_countがインクリメントされる() {
+        // Arrange
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // Act
+        pavo.update_last_selected(&canonical_path).unwrap();
+        pavo.update_last_selected(&canonical_path).unwrap();
+        pavo.update_last_selected(&canonical_path).unwrap();
+
+        // Assert
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.access_count, 3);
+    }
+
+    #[test]
+    fn test_update_last_selected_access_countが保存される() {
+        // Arrange
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // Act
+        pavo.update_last_selected(&canonical_path).unwrap();
+
+        // Assert - 設定ファイルから読み込んで確認
+        let config_file = pavo.get_config_file();
+        let content = std::fs::read_to_string(config_file).unwrap();
+        assert!(content.contains("access_count = 1"));
     }
 }
