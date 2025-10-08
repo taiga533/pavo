@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -41,9 +41,14 @@ impl Default for Config {
 
 impl Config {
     pub fn new(config_dir: Option<PathBuf>) -> Result<Self> {
-        let config_dir = config_dir
-            .or_else(dirs::config_dir)
-            .context("Could not find config directory")?;
+        let config_dir = config_dir.unwrap_or_else(|| {
+            std::env::var("XDG_CONFIG_HOME")
+                .ok()
+                .map(PathBuf::from)
+                .or_else(|| dirs::home_dir().map(|home| home.join(".config")))
+                .map(|base| base.join("pavo"))
+                .expect("Could not determine config directory")
+        });
         fs::create_dir_all(&config_dir)?;
         let config_file = config_dir.join("pavo.toml");
 

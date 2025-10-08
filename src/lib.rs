@@ -14,7 +14,7 @@ pub mod test_helper;
 pub mod tui;
 
 pub fn run() -> anyhow::Result<()> {
-    let config_dir = std::env::var("PATH_HOPPER_CONFIG_DIR")
+    let config_dir = std::env::var("PAVO_CONFIG_DIR")
         .map(PathBuf::from)
         .ok();
     let mut pavo = Pavo::new(config_dir)?;

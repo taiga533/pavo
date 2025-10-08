@@ -8,7 +8,7 @@ mod tests {
 
     fn setup() -> TempDir {
         let temp_dir = tempfile::tempdir().unwrap();
-        env::set_var("PATH_HOPPER_CONFIG_DIR", temp_dir.path().to_str().unwrap());
+        env::set_var("PAVO_CONFIG_DIR", temp_dir.path().to_str().unwrap());
         temp_dir
     }
 

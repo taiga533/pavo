@@ -39,7 +39,7 @@ cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
 ### コア構造
 
 - **Pavo** (`src/pavo.rs`): メインのアプリケーション構造体。設定ファイルの管理、パスの追加/削除、プレビュー生成を担当
-- **Config** (`src/config.rs`): TOML形式の設定ファイル (`~/.config/pavo.toml`) の読み書きを管理。パスのリスト、自動クリーニング設定、最終選択時刻を保持
+- **Config** (`src/config.rs`): TOML形式の設定ファイル (`$XDG_CONFIG_HOME/pavo/pavo.toml` または `~/.config/pavo/pavo.toml`) の読み書きを管理。パスのリスト、自動クリーニング設定、最終選択時刻を保持
 - **Entry trait** (`src/entry.rs`): プレビュー生成のための抽象化。以下の実装がある:
   - `DirectoryEntry` (`src/entry/directory.rs`): ディレクトリのファイル一覧表示
   - `FileEntry` (`src/entry/file.rs`): ファイル内容のプレビュー (batライブラリを使用)
