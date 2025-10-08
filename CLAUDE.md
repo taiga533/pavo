@@ -58,6 +58,7 @@ path = "/path/to/bookmark"
 persist = true
 last_selected = "2025-01-01T00:00:00Z"
 tags = ["work", "rust"]  # タグのリスト
+access_count = 42  # 参照回数（TUIでパスを選択するたびにインクリメント）
 ```
 
 ### パス管理の仕組み
@@ -65,8 +66,9 @@ tags = ["work", "rust"]  # タグのリスト
 1. パスは常に正規化された絶対パスとして保存される (`canonicalize()`)
 2. `persist = true` のパスは、存在しなくなっても `clean` コマンドで削除されない
 3. `auto_clean = true` の場合、`max_unselected_time` を超えたパスは自動削除される
-4. 選択時に `last_selected` が更新される
+4. 選択時に `last_selected` と `access_count` が更新される
 5. 各パスには複数のタグを付与でき、タグで絞り込んで表示できる
+6. TUIではパスが使用頻度順（`access_count` 降順）にソートされ、同じ使用頻度の場合は最終選択時刻順（`last_selected` 降順）にソートされる
 
 ### UI操作
 

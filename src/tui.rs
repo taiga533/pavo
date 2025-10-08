@@ -684,17 +684,25 @@ pub fn run_tui(pavo: &mut Pavo, tag_filter: Option<&str>) -> Result<()> {
     let mut terminal = Terminal::new(backend).context("Failed to create terminal")?;
 
     // アプリケーションの実行
-    let paths: Vec<PathBuf> = if let Some(tag) = tag_filter {
+    let mut config_paths = if let Some(tag) = tag_filter {
         pavo.get_paths_by_tag(tag)
-            .iter()
-            .map(|config_path| config_path.path.clone())
-            .collect()
     } else {
-        pavo.get_paths()
-            .iter()
-            .map(|config_path| config_path.path.clone())
-            .collect()
+        pavo.get_paths().clone()
     };
+
+    // 使用頻度順にソート (降順)
+    // access_countが同じ場合はlast_selected順にソート
+    config_paths.sort_by(|a, b| {
+        match b.access_count.cmp(&a.access_count) {
+            std::cmp::Ordering::Equal => b.last_selected.cmp(&a.last_selected),
+            other => other,
+        }
+    });
+
+    let paths: Vec<PathBuf> = config_paths
+        .iter()
+        .map(|config_path| config_path.path.clone())
+        .collect();
     let mut app = App::new(paths, tag_filter.map(|s| s.to_string()));
 
     loop {
