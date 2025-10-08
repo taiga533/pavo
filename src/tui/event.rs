@@ -80,12 +80,7 @@ fn handle_modal_event(
 }
 
 /// 通常のイベント処理
-fn handle_normal_event(
-    app: &mut App,
-    pavo: &Pavo,
-    key_code: KeyCode,
-    key_modifiers: KeyModifiers,
-) {
+fn handle_normal_event(app: &mut App, pavo: &Pavo, key_code: KeyCode, key_modifiers: KeyModifiers) {
     match (key_code, key_modifiers) {
         (KeyCode::Char('c'), KeyModifiers::CONTROL) | (KeyCode::Esc, _) => {
             app.quit();

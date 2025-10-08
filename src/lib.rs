@@ -14,9 +14,7 @@ pub mod test_helper;
 pub mod tui;
 
 pub fn run() -> anyhow::Result<()> {
-    let config_dir = std::env::var("PAVO_CONFIG_DIR")
-        .map(PathBuf::from)
-        .ok();
+    let config_dir = std::env::var("PAVO_CONFIG_DIR").map(PathBuf::from).ok();
     let mut pavo = Pavo::new(config_dir)?;
     let cli = cli::Cli::parse();
     let tag_filter = cli.tag.clone();

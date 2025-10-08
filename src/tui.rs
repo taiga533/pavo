@@ -1,9 +1,9 @@
 // サブモジュール定義
-mod focus;
 mod app;
 mod event;
-mod ui;
+mod focus;
 mod runner;
+mod ui;
 
 // 公開API
 pub use runner::run_tui;

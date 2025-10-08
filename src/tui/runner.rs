@@ -24,8 +24,7 @@ pub fn run_tui(pavo: &mut Pavo, tag_filter: Option<&str>) -> Result<()> {
         .write(true)
         .open("/dev/tty")
         .context("Failed to open /dev/tty")?;
-    execute!(tty, EnterAlternateScreen)
-        .context("Failed to setup terminal")?;
+    execute!(tty, EnterAlternateScreen).context("Failed to setup terminal")?;
     let backend = CrosstermBackend::new(tty);
     let mut terminal = Terminal::new(backend).context("Failed to create terminal")?;
 
@@ -60,8 +59,7 @@ pub fn run_tui(pavo: &mut Pavo, tag_filter: Option<&str>) -> Result<()> {
 
     // ターミナルの復元
     disable_raw_mode().context("Failed to disable raw mode")?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)
-        .context("Failed to restore terminal")?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen).context("Failed to restore terminal")?;
     terminal.show_cursor().context("Failed to show cursor")?;
 
     // 選択されたパスを処理
