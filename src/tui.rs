@@ -10,7 +10,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
@@ -69,8 +69,8 @@ pub struct App {
     paths: Vec<PathBuf>,
     /// 表示用の短縮パスのリスト
     display_paths: Vec<String>,
-    /// フィルタリング後のパスのインデックス
-    filtered_indices: Vec<usize>,
+    /// フィルタリング後のパスのインデックスとマッチ位置
+    filtered_indices: Vec<(usize, Vec<usize>)>,
     /// 選択中のアイテムのインデックス
     selected: usize,
     /// 入力中のクエリ
@@ -111,7 +111,7 @@ impl App {
     /// * `paths` - パスのリスト
     /// * `tag_filter` - タグフィルター
     pub fn new(paths: Vec<PathBuf>, tag_filter: Option<String>) -> Self {
-        let filtered_indices: Vec<usize> = (0..paths.len()).collect();
+        let filtered_indices: Vec<(usize, Vec<usize>)> = (0..paths.len()).map(|i| (i, vec![])).collect();
         let display_paths = path_display::compute_display_paths(&paths);
         let preview = if !paths.is_empty() {
             Pavo::get_entry_preview(&paths[0]).unwrap_or_default()
@@ -144,21 +144,20 @@ impl App {
     /// 入力クエリに基づいてパスをフィルタリングする
     fn filter_paths(&mut self) {
         if self.input.is_empty() {
-            self.filtered_indices = (0..self.paths.len()).collect();
+            self.filtered_indices = (0..self.paths.len()).map(|i| (i, vec![])).collect();
         } else {
             self.filtered_indices = self
-                .paths
+                .display_paths
                 .iter()
                 .enumerate()
-                .filter_map(|(i, path)| {
-                    let path_str = path.display().to_string();
+                .filter_map(|(i, display_path)| {
                     self.matcher
-                        .fuzzy_match(&path_str, &self.input)
-                        .map(|score| (i, score))
+                        .fuzzy_indices(display_path, &self.input)
+                        .map(|(score, indices)| (i, score, indices))
                 })
                 .collect::<Vec<_>>()
                 .into_iter()
-                .map(|(i, _)| i)
+                .map(|(i, _, indices)| (i, indices))
                 .collect();
         }
         self.selected = 0;
@@ -167,7 +166,7 @@ impl App {
 
     /// プレビューを更新する
     fn update_preview(&mut self) {
-        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+        if let Some(&(idx, _)) = self.filtered_indices.get(self.selected) {
             self.preview = Pavo::get_entry_preview(&self.paths[idx]).unwrap_or_default();
         } else {
             self.preview = vec![];
@@ -197,7 +196,7 @@ impl App {
 
     /// 現在選択中のパスを確定する
     fn confirm_selection(&mut self) {
-        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+        if let Some(&(idx, _)) = self.filtered_indices.get(self.selected) {
             self.selected_path = Some(self.paths[idx].clone());
             self.should_quit = true;
         }
@@ -252,7 +251,7 @@ impl App {
 
     /// モーダルを開く
     fn open_modal(&mut self, pavo: &Pavo) {
-        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+        if let Some(&(idx, _)) = self.filtered_indices.get(self.selected) {
             let path = &self.paths[idx];
             if let Some(config_path) = pavo.get_paths().iter().find(|cp| cp.path == *path) {
                 self.modal_persist_value = config_path.persist;
@@ -282,7 +281,7 @@ impl App {
 
     /// モーダルの変更を確定する
     fn confirm_modal(&mut self) -> Option<(usize, bool, Vec<String>)> {
-        if let Some(&idx) = self.filtered_indices.get(self.selected) {
+        if let Some(&(idx, _)) = self.filtered_indices.get(self.selected) {
             let tags: Vec<String> = self
                 .modal_tags_input
                 .split(',')
@@ -473,7 +472,7 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
     let items: Vec<ListItem> = app
         .filtered_indices
         .iter()
-        .map(|&idx| {
+        .map(|&(idx, ref match_indices)| {
             let path = &app.paths[idx];
             let display_path = &app.display_paths[idx];
             let config_path = config_paths.iter().find(|cp| cp.path == *path);
@@ -489,7 +488,44 @@ fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
                     }
                 })
                 .unwrap_or_default();
-            ListItem::new(format!("{}{}{}", display_path, persist_mark, tags_display))
+
+            // マッチ位置をハイライト
+            let mut spans = Vec::new();
+            let chars: Vec<char> = display_path.chars().collect();
+            let mut last_idx = 0;
+
+            for &match_idx in match_indices {
+                // マッチしていない部分
+                if last_idx < match_idx {
+                    let unmatched: String = chars[last_idx..match_idx].iter().collect();
+                    spans.push(Span::raw(unmatched));
+                }
+
+                // マッチした部分をハイライト
+                if match_idx < chars.len() {
+                    spans.push(Span::styled(
+                        chars[match_idx].to_string(),
+                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                    ));
+                    last_idx = match_idx + 1;
+                }
+            }
+
+            // 残りの部分
+            if last_idx < chars.len() {
+                let remaining: String = chars[last_idx..].iter().collect();
+                spans.push(Span::raw(remaining));
+            }
+
+            // persist_markとtags_displayを追加
+            if !persist_mark.is_empty() {
+                spans.push(Span::raw(persist_mark));
+            }
+            if !tags_display.is_empty() {
+                spans.push(Span::raw(tags_display));
+            }
+
+            ListItem::new(Line::from(spans))
         })
         .collect();
 
@@ -580,7 +616,7 @@ fn draw_modal(f: &mut Frame, app: &App, _pavo: &Pavo) {
     f.render_widget(Clear, modal_area);
 
     // 選択中のパスの情報を取得
-    let path_display = if let Some(&idx) = app.filtered_indices.get(app.selected) {
+    let path_display = if let Some(&(idx, _)) = app.filtered_indices.get(app.selected) {
         app.paths[idx].display().to_string()
     } else {
         String::new()
@@ -729,7 +765,7 @@ mod tests {
 
         // Assert
         assert_eq!(app.paths.len(), 2);
-        assert_eq!(app.filtered_indices, vec![0, 1]);
+        assert_eq!(app.filtered_indices, vec![(0, vec![]), (1, vec![])]);
         assert_eq!(app.selected, 0);
     }
 
@@ -842,8 +878,8 @@ mod tests {
 
         // Assert
         assert_eq!(app.filtered_indices.len(), 2);
-        assert!(app.filtered_indices.contains(&0));
-        assert!(app.filtered_indices.contains(&1));
+        assert!(app.filtered_indices.iter().any(|(idx, _)| *idx == 0));
+        assert!(app.filtered_indices.iter().any(|(idx, _)| *idx == 1));
     }
 
     #[test]
@@ -858,7 +894,7 @@ mod tests {
         app.filter_paths();
 
         // Assert
-        assert_eq!(app.filtered_indices, vec![0, 1]);
+        assert_eq!(app.filtered_indices, vec![(0, vec![]), (1, vec![])]);
     }
 
     #[test]
@@ -1199,4 +1235,45 @@ mod tests {
         assert_eq!(app.modal_original_persist, true);
         assert_eq!(app.modal_original_tags, "work, rust");
     }
+
+    #[test]
+    fn test_filter_paths_マッチ位置情報が格納される() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![
+            temp_dir.path().join("test1"),
+            temp_dir.path().join("other"),
+        ];
+        let mut app = App::new(paths, None);
+
+        // Act
+        app.input = "t1".to_string();
+        app.filter_paths();
+
+        // Assert
+        assert_eq!(app.filtered_indices.len(), 1);
+        let (idx, match_indices) = &app.filtered_indices[0];
+        assert_eq!(*idx, 0);
+        // "test1"の"t"と"1"にマッチ
+        assert!(!match_indices.is_empty());
+    }
+
+    #[test]
+    fn test_filter_paths_空入力時はマッチ位置が空() {
+        // Arrange
+        let temp_dir = create_test_env();
+        let paths = vec![temp_dir.path().join("test1")];
+        let mut app = App::new(paths, None);
+
+        // Act
+        app.input = "".to_string();
+        app.filter_paths();
+
+        // Assert
+        assert_eq!(app.filtered_indices.len(), 1);
+        let (idx, match_indices) = &app.filtered_indices[0];
+        assert_eq!(*idx, 0);
+        assert!(match_indices.is_empty());
+    }
 }
+
