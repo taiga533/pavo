@@ -39,7 +39,7 @@ impl Pavo {
         }
     }
 
-    fn is_git_repo(dir: &Path) -> bool {
+    pub fn is_git_repo(dir: &Path) -> bool {
         Repository::open(dir).is_ok()
     }
 
@@ -77,6 +77,15 @@ impl Pavo {
         &self.config.paths
     }
 
+    pub fn get_paths_by_tag(&self, tag: &str) -> Vec<ConfigPath> {
+        self.config
+            .paths
+            .iter()
+            .filter(|config_path| config_path.tags.contains(&tag.to_string()))
+            .cloned()
+            .collect()
+    }
+
     pub fn update_last_selected(&mut self, path: &Path) -> Result<()> {
         if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
             config_path.last_selected = chrono::Utc::now();
@@ -96,6 +105,32 @@ impl Pavo {
     pub fn set_persist(&mut self, path: &Path, persist: bool) -> Result<()> {
         if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
             config_path.persist = persist;
+            self.config.save(&self.config_file)?;
+        }
+        Ok(())
+    }
+
+    pub fn add_tag(&mut self, path: &Path, tag: &str) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            if !config_path.tags.contains(&tag.to_string()) {
+                config_path.tags.push(tag.to_string());
+                self.config.save(&self.config_file)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn remove_tag(&mut self, path: &Path, tag: &str) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            config_path.tags.retain(|t| t != tag);
+            self.config.save(&self.config_file)?;
+        }
+        Ok(())
+    }
+
+    pub fn set_tags(&mut self, path: &Path, tags: Vec<String>) -> Result<()> {
+        if let Some(config_path) = self.config.paths.iter_mut().find(|p| p.path == path) {
+            config_path.tags = tags;
             self.config.save(&self.config_file)?;
         }
         Ok(())
@@ -305,5 +340,156 @@ mod tests {
             .find(|p| p.path == canonical_path)
             .unwrap();
         assert!(!config_path.persist);
+    }
+
+    #[test]
+    fn test_add_tag_タグが追加される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // タグを追加
+        pavo.add_tag(&canonical_path, "work").unwrap();
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.tags, vec!["work"]);
+
+        // もう一つタグを追加
+        pavo.add_tag(&canonical_path, "rust").unwrap();
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.tags, vec!["work", "rust"]);
+    }
+
+    #[test]
+    fn test_add_tag_重複したタグは追加されない() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // タグを追加
+        pavo.add_tag(&canonical_path, "work").unwrap();
+        pavo.add_tag(&canonical_path, "work").unwrap();
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.tags, vec!["work"]);
+    }
+
+    #[test]
+    fn test_remove_tag_タグが削除される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // タグを追加
+        pavo.add_tag(&canonical_path, "work").unwrap();
+        pavo.add_tag(&canonical_path, "rust").unwrap();
+
+        // タグを削除
+        pavo.remove_tag(&canonical_path, "work").unwrap();
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.tags, vec!["rust"]);
+    }
+
+    #[test]
+    fn test_set_tags_タグが設定される() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir = tempfile::tempdir().unwrap();
+        pavo.add_path(temp_dir.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path = temp_dir.path().canonicalize().unwrap();
+
+        // タグを設定
+        pavo.set_tags(
+            &canonical_path,
+            vec!["work".to_string(), "rust".to_string()],
+        )
+        .unwrap();
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.tags, vec!["work", "rust"]);
+
+        // タグを上書き
+        pavo.set_tags(&canonical_path, vec!["personal".to_string()])
+            .unwrap();
+
+        let config_path = pavo
+            .get_paths()
+            .iter()
+            .find(|p| p.path == canonical_path)
+            .unwrap();
+        assert_eq!(config_path.tags, vec!["personal"]);
+    }
+
+    #[test]
+    fn test_get_paths_by_tag_タグでフィルタリングされる() {
+        let (mut pavo, _temp_config_dir) = setup();
+        let temp_dir1 = tempfile::tempdir().unwrap();
+        let temp_dir2 = tempfile::tempdir().unwrap();
+        let temp_dir3 = tempfile::tempdir().unwrap();
+
+        pavo.add_path(temp_dir1.path().to_str().unwrap(), false)
+            .unwrap();
+        pavo.add_path(temp_dir2.path().to_str().unwrap(), false)
+            .unwrap();
+        pavo.add_path(temp_dir3.path().to_str().unwrap(), false)
+            .unwrap();
+
+        let canonical_path1 = temp_dir1.path().canonicalize().unwrap();
+        let canonical_path2 = temp_dir2.path().canonicalize().unwrap();
+        let canonical_path3 = temp_dir3.path().canonicalize().unwrap();
+
+        // タグを設定
+        pavo.add_tag(&canonical_path1, "work").unwrap();
+        pavo.add_tag(&canonical_path2, "work").unwrap();
+        pavo.add_tag(&canonical_path2, "rust").unwrap();
+        pavo.add_tag(&canonical_path3, "personal").unwrap();
+
+        // workタグでフィルタリング
+        let work_paths = pavo.get_paths_by_tag("work");
+        assert_eq!(work_paths.len(), 2);
+        assert!(work_paths.iter().any(|p| p.path == canonical_path1));
+        assert!(work_paths.iter().any(|p| p.path == canonical_path2));
+
+        // rustタグでフィルタリング
+        let rust_paths = pavo.get_paths_by_tag("rust");
+        assert_eq!(rust_paths.len(), 1);
+        assert_eq!(rust_paths[0].path, canonical_path2);
+
+        // personalタグでフィルタリング
+        let personal_paths = pavo.get_paths_by_tag("personal");
+        assert_eq!(personal_paths.len(), 1);
+        assert_eq!(personal_paths[0].path, canonical_path3);
     }
 }

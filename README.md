@@ -36,6 +36,14 @@ pavo add --persist
 pavo add -p
 ```
 
+### Filter by tags
+
+```bash
+# Display paths filtered by tag in TUI
+pavo --tag work
+pavo -t rust
+```
+
 ### Remove bookmarks
 
 ```bash
@@ -58,10 +66,21 @@ The configuration file is stored in `~/.config/pavo/config.toml`.
 auto_clean = true # whether to automatically delete bookmarks that haven't been referenced for a certain period
 max_unselected_time = 604800 # 7 days (unit: seconds)
 
-[paths]
-# paths to bookmark
-"~/path/to/bookmark" = { persist = true, last_selected = "2025-01-01T00:00:00Z" }
+[[paths]]
+path = "/path/to/bookmark"
+persist = true
+last_selected = "2025-01-01T00:00:00Z"
+tags = ["work", "rust"]  # List of tags (comma-separated)
 ```
+
+### Managing Tags
+
+In TUI mode (run `pavo` command without arguments), focus on the Paths panel and press Enter to open the path settings modal where you can edit tags.
+
+- Tags are entered comma-separated (e.g. `work, rust, cli`)
+- Any characters can be used in tag names (whitespace is automatically trimmed)
+- Use Tab key to switch between fields
+- Press Enter to save or Esc to cancel (discard changes) and close the modal
 
 ## Shell Integration
 
@@ -88,5 +107,7 @@ pavo init fish | source
 After setting up shell integration, you can use the `p` command to navigate:
 
 ```bash
-p  # Opens the TUI to select a bookmarked path and navigates to it
+p               # Opens the TUI to select a bookmarked path and navigates to it
+p --tag work    # Select from paths tagged with "work"
+p -t rust       # Select from paths tagged with "rust"
 ```

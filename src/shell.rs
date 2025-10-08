@@ -23,7 +23,22 @@ fn generate_bash_zsh_script() -> String {
 
 p() {
     local result
-    result=$(pavo </dev/tty)
+    local tag_arg=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -t|--tag)
+                tag_arg="--tag $2"
+                shift 2
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    result=$(pavo $tag_arg </dev/tty)
     if [ $? -eq 0 ] && [ -n "$result" ]; then
         if [ -d "$result" ]; then
             cd "$result" || return
@@ -32,6 +47,26 @@ p() {
         fi
     fi
 }
+
+# Auto-record git repositories on directory change
+_pavo_record_hook() {
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        pavo add 2>/dev/null
+    fi
+}
+
+# Hook for bash
+if [ -n "$BASH_VERSION" ]; then
+    if [[ "$PROMPT_COMMAND" != *"_pavo_record_hook"* ]]; then
+        PROMPT_COMMAND="_pavo_record_hook${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+    fi
+fi
+
+# Hook for zsh
+if [ -n "$ZSH_VERSION" ]; then
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd _pavo_record_hook
+fi
 "#
     .to_string()
 }
@@ -42,13 +77,28 @@ fn generate_fish_script() -> String {
 # pavo init fish | source
 
 function p
-    set -l result (pavo </dev/tty)
+    set -l tag_arg ""
+
+    # Parse options
+    argparse 't/tag=' -- $argv
+    if set -q _flag_tag
+        set tag_arg "--tag $_flag_tag"
+    end
+
+    set -l result (pavo $tag_arg </dev/tty)
     if test $status -eq 0 -a -n "$result"
         if test -d "$result"
             cd $result
         else
             echo $result
         end
+    end
+end
+
+# Auto-record git repositories on directory change
+function _pavo_record_hook --on-variable PWD
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1
+        pavo add 2>/dev/null
     end
 end
 "#
@@ -108,5 +158,32 @@ mod tests {
         let script = generate_init_script("fish").unwrap();
         assert!(script.contains("pavo init fish | source"));
         assert!(script.contains("~/.config/fish/config.fish"));
+    }
+
+    #[test]
+    fn test_bashスクリプトに自動記録フックが含まれること() {
+        let script = generate_init_script("bash").unwrap();
+        assert!(script.contains("_pavo_record_hook"));
+        assert!(script.contains("pavo add"));
+        assert!(script.contains("git rev-parse --is-inside-work-tree"));
+        assert!(script.contains("PROMPT_COMMAND"));
+    }
+
+    #[test]
+    fn test_zshスクリプトに自動記録フックが含まれること() {
+        let script = generate_init_script("zsh").unwrap();
+        assert!(script.contains("_pavo_record_hook"));
+        assert!(script.contains("pavo add"));
+        assert!(script.contains("git rev-parse --is-inside-work-tree"));
+        assert!(script.contains("add-zsh-hook precmd"));
+    }
+
+    #[test]
+    fn test_fishスクリプトに自動記録フックが含まれること() {
+        let script = generate_init_script("fish").unwrap();
+        assert!(script.contains("_pavo_record_hook"));
+        assert!(script.contains("pavo add"));
+        assert!(script.contains("git rev-parse --is-inside-work-tree"));
+        assert!(script.contains("--on-variable PWD"));
     }
 }

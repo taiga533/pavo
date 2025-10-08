@@ -6,6 +6,9 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
+    /// Filter by tag
+    #[arg(short, long)]
+    pub tag: Option<String>,
 }
 
 #[derive(Subcommand)]
