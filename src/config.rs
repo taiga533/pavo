@@ -316,4 +316,53 @@ mod tests {
         let loaded_config: Config = toml::from_str(&content).unwrap();
         assert_eq!(loaded_config.paths[0].access_count, 42);
     }
+
+    #[test]
+    fn test_new_config_xdg_config_homeが設定されている場合に使用される() {
+        // Arrange
+        let temp_dir = tempdir().unwrap();
+        let xdg_config_home = temp_dir.path().join("xdg_config");
+        fs::create_dir_all(&xdg_config_home).unwrap();
+
+        // Act
+        std::env::set_var("XDG_CONFIG_HOME", &xdg_config_home);
+        let config = Config::new(None).unwrap();
+        std::env::remove_var("XDG_CONFIG_HOME");
+
+        // Assert
+        let expected_config_file = xdg_config_home.join("pavo").join("pavo.toml");
+        assert!(expected_config_file.exists());
+        assert!(config.paths.is_empty());
+        assert!(config.auto_clean);
+    }
+
+    #[test]
+    fn test_new_config_既存の設定ファイルを正しく読み込む() {
+        // Arrange
+        let temp_dir = tempdir().unwrap();
+        let config_file = temp_dir.path().join("pavo.toml");
+
+        // 既存の設定ファイルを作成
+        let mut original_config = Config::default();
+        let test_dir = tempdir().unwrap();
+        original_config
+            .add_path(test_dir.path().to_path_buf(), false)
+            .unwrap();
+        original_config.paths[0].access_count = 10;
+        original_config.paths[0].tags = vec!["test".to_string()];
+        original_config.auto_clean = false;
+        original_config.max_unselected_time = 3600;
+        original_config.save(&config_file).unwrap();
+
+        // Act
+        let loaded_config = Config::new(Some(temp_dir.path().to_path_buf())).unwrap();
+
+        // Assert
+        assert_eq!(loaded_config.paths.len(), 1);
+        assert_eq!(loaded_config.paths[0].path, test_dir.path());
+        assert_eq!(loaded_config.paths[0].access_count, 10);
+        assert_eq!(loaded_config.paths[0].tags, vec!["test"]);
+        assert!(!loaded_config.auto_clean);
+        assert_eq!(loaded_config.max_unselected_time, 3600);
+    }
 }
