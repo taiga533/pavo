@@ -20,6 +20,8 @@ pub struct App {
     selected: usize,
     /// 入力中のクエリ
     input: String,
+    /// 検索入力のカーソル位置（文字単位）
+    input_cursor: usize,
     /// ファジーマッチャー
     matcher: SkimMatcherV2,
     /// アプリケーションを終了するかどうか
@@ -38,6 +40,8 @@ pub struct App {
     modal_persist_value: bool,
     /// モーダル内で編集中のタグリスト
     modal_tags_input: String,
+    /// モーダルのタグ入力のカーソル位置（文字単位）
+    modal_tags_cursor: usize,
     /// タグフィルター
     #[allow(dead_code)]
     tag_filter: Option<String>,
@@ -71,6 +75,7 @@ impl App {
             filtered_indices,
             selected: 0,
             input: String::new(),
+            input_cursor: 0,
             matcher: SkimMatcherV2::default(),
             should_quit: false,
             selected_path: None,
@@ -80,6 +85,7 @@ impl App {
             show_modal: false,
             modal_persist_value: false,
             modal_tags_input: String::new(),
+            modal_tags_cursor: 0,
             tag_filter,
             modal_focus: ModalFocus::Persist,
             modal_original_persist: false,
@@ -148,21 +154,58 @@ impl App {
         }
     }
 
-    /// 入力に文字を追加する
+    /// 入力に文字を追加する（カーソル位置に挿入）
     pub fn add_char(&mut self, c: char) {
-        self.input.push(c);
+        let chars: Vec<char> = self.input.chars().collect();
+        let mut new_input = String::new();
+        for (i, &ch) in chars.iter().enumerate() {
+            if i == self.input_cursor {
+                new_input.push(c);
+            }
+            new_input.push(ch);
+        }
+        if self.input_cursor >= chars.len() {
+            new_input.push(c);
+        }
+        self.input = new_input;
+        self.input_cursor += 1;
         self.filter_paths();
     }
 
-    /// 入力から最後の文字を削除する
+    /// 入力から文字を削除する（カーソルの左側の文字を削除）
     pub fn delete_char(&mut self) {
-        self.input.pop();
-        self.filter_paths();
+        if self.input_cursor > 0 {
+            let chars: Vec<char> = self.input.chars().collect();
+            let mut new_input = String::new();
+            for (i, &ch) in chars.iter().enumerate() {
+                if i != self.input_cursor - 1 {
+                    new_input.push(ch);
+                }
+            }
+            self.input = new_input;
+            self.input_cursor -= 1;
+            self.filter_paths();
+        }
     }
 
     /// アプリケーションを終了する
     pub fn quit(&mut self) {
         self.should_quit = true;
+    }
+
+    /// カーソルを左に移動する
+    pub fn move_cursor_left(&mut self) {
+        if self.input_cursor > 0 {
+            self.input_cursor -= 1;
+        }
+    }
+
+    /// カーソルを右に移動する
+    pub fn move_cursor_right(&mut self) {
+        let len = self.input.chars().count();
+        if self.input_cursor < len {
+            self.input_cursor += 1;
+        }
     }
 
     /// 次のパネルにフォーカスを移動する
@@ -194,12 +237,14 @@ impl App {
             if let Some(config_path) = pavo.get_paths().iter().find(|cp| cp.path == *path) {
                 self.modal_persist_value = config_path.persist;
                 self.modal_tags_input = config_path.tags.join(", ");
+                self.modal_tags_cursor = self.modal_tags_input.chars().count();
                 // 元の値を保存
                 self.modal_original_persist = config_path.persist;
                 self.modal_original_tags = self.modal_tags_input.clone();
             } else {
                 self.modal_persist_value = false;
                 self.modal_tags_input = String::new();
+                self.modal_tags_cursor = 0;
                 self.modal_original_persist = false;
                 self.modal_original_tags = String::new();
             }
@@ -232,19 +277,56 @@ impl App {
         }
     }
 
-    /// モーダルのタグ入力に文字を追加する
+    /// モーダルのタグ入力に文字を追加する（カーソル位置に挿入）
     pub fn add_char_to_modal_tags(&mut self, c: char) {
-        self.modal_tags_input.push(c);
+        let chars: Vec<char> = self.modal_tags_input.chars().collect();
+        let mut new_input = String::new();
+        for (i, &ch) in chars.iter().enumerate() {
+            if i == self.modal_tags_cursor {
+                new_input.push(c);
+            }
+            new_input.push(ch);
+        }
+        if self.modal_tags_cursor >= chars.len() {
+            new_input.push(c);
+        }
+        self.modal_tags_input = new_input;
+        self.modal_tags_cursor += 1;
     }
 
-    /// モーダルのタグ入力から最後の文字を削除する
+    /// モーダルのタグ入力から文字を削除する（カーソルの左側の文字を削除）
     pub fn delete_char_from_modal_tags(&mut self) {
-        self.modal_tags_input.pop();
+        if self.modal_tags_cursor > 0 {
+            let chars: Vec<char> = self.modal_tags_input.chars().collect();
+            let mut new_input = String::new();
+            for (i, &ch) in chars.iter().enumerate() {
+                if i != self.modal_tags_cursor - 1 {
+                    new_input.push(ch);
+                }
+            }
+            self.modal_tags_input = new_input;
+            self.modal_tags_cursor -= 1;
+        }
     }
 
     /// モーダル内で次のフィールドにフォーカスを移動する
     pub fn modal_focus_next(&mut self) {
         self.modal_focus = self.modal_focus.next();
+    }
+
+    /// モーダルのタグ入力でカーソルを左に移動する
+    pub fn move_modal_cursor_left(&mut self) {
+        if self.modal_tags_cursor > 0 {
+            self.modal_tags_cursor -= 1;
+        }
+    }
+
+    /// モーダルのタグ入力でカーソルを右に移動する
+    pub fn move_modal_cursor_right(&mut self) {
+        let len = self.modal_tags_input.chars().count();
+        if self.modal_tags_cursor < len {
+            self.modal_tags_cursor += 1;
+        }
     }
 
     /// モーダルをキャンセルする（変更を破棄）
@@ -272,6 +354,10 @@ impl App {
 
     pub fn input(&self) -> &str {
         &self.input
+    }
+
+    pub fn input_cursor(&self) -> usize {
+        self.input_cursor
     }
 
     pub fn should_quit(&self) -> bool {
@@ -304,6 +390,10 @@ impl App {
 
     pub fn modal_tags_input(&self) -> &str {
         &self.modal_tags_input
+    }
+
+    pub fn modal_tags_cursor(&self) -> usize {
+        self.modal_tags_cursor
     }
 
     pub fn modal_focus(&self) -> ModalFocus {
@@ -445,6 +535,7 @@ mod tests {
         let paths = vec![temp_dir.path().join("test1")];
         let mut app = App::new(paths, None);
         app.input = "test".to_string();
+        app.input_cursor = 4; // カーソルを末尾に配置
 
         // Act
         app.delete_char();
@@ -698,6 +789,7 @@ mod tests {
         let paths = vec![temp_dir.path().join("test1")];
         let mut app = App::new(paths, None);
         app.modal_tags_input = "work".to_string();
+        app.modal_tags_cursor = 4; // カーソルを末尾に配置
 
         // Act
         app.delete_char_from_modal_tags();

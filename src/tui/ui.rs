@@ -183,7 +183,7 @@ pub fn ui(f: &mut Frame, app: &App, pavo: &Pavo) {
 
     // Searchパネルがフォーカスされている場合、カーソルを表示
     if app.focused_panel() == FocusedPanel::Search {
-        let cursor_x = chunks[1].x + 1 + app.input().chars().count() as u16;
+        let cursor_x = chunks[1].x + 1 + app.input_cursor() as u16;
         let cursor_y = chunks[1].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     }
@@ -270,8 +270,8 @@ fn draw_modal(f: &mut Frame, app: &App) {
 
     // Tagsフィールドがフォーカスされている場合、カーソルを表示
     if app.modal_focus() == ModalFocus::Tags {
-        // " > Tags: "の長さ（9文字）+ タグ入力の長さ
-        let cursor_x = modal_area.x + 1 + 9 + app.modal_tags_input().chars().count() as u16;
+        // " > Tags: "の長さ（9文字）+ カーソル位置
+        let cursor_x = modal_area.x + 1 + 9 + app.modal_tags_cursor() as u16;
         let cursor_y = modal_area.y + 4; // ボーダー + Path行 + 空行 + Persist行 + Tags行
         f.set_cursor_position((cursor_x, cursor_y));
     }

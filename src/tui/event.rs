@@ -59,6 +59,16 @@ fn handle_modal_event(
                 app.delete_char_from_modal_tags();
             }
         }
+        KeyCode::Left => {
+            if app.modal_focus() == ModalFocus::Tags {
+                app.move_modal_cursor_left();
+            }
+        }
+        KeyCode::Right => {
+            if app.modal_focus() == ModalFocus::Tags {
+                app.move_modal_cursor_right();
+            }
+        }
         KeyCode::Char(c) => {
             if app.modal_focus() == ModalFocus::Tags {
                 app.add_char_to_modal_tags(c);
@@ -118,6 +128,16 @@ fn handle_normal_event(
         (KeyCode::Backspace, _) => {
             if app.focused_panel() == FocusedPanel::Search {
                 app.delete_char();
+            }
+        }
+        (KeyCode::Left, _) => {
+            if app.focused_panel() == FocusedPanel::Search {
+                app.move_cursor_left();
+            }
+        }
+        (KeyCode::Right, _) => {
+            if app.focused_panel() == FocusedPanel::Search {
+                app.move_cursor_right();
             }
         }
         (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
