@@ -241,10 +241,10 @@ fn draw_modal(f: &mut Frame, app: &App) {
 
     let modal_text = format!(
         "Path: {}\n\n\
-         {} {} Persist\n\
-         {} Tags: {}\n\n\
-         [Tab] Switch field  [↑/↓/Space] Toggle (Persist)\n\
-         [Enter] Save  [Esc] Cancel",
+{} {} Persist\n\
+{} Tags: {}\n\n\
+[Tab] Switch field  [↑/↓/Space] Toggle (Persist)\n\
+[Enter] Save  [Esc] Cancel",
         path_display,
         persist_indicator,
         persist_checkbox,
@@ -270,8 +270,8 @@ fn draw_modal(f: &mut Frame, app: &App) {
 
     // Tagsフィールドがフォーカスされている場合、カーソルを表示
     if app.modal_focus() == ModalFocus::Tags {
-        // " > Tags: "の長さ（9文字）+ カーソル位置
-        let cursor_x = modal_area.x + 1 + 9 + app.modal_tags_cursor() as u16;
+        // "> Tags: "の長さ（8文字）+ カーソル位置
+        let cursor_x = modal_area.x + 1 + 8 + app.modal_tags_cursor() as u16;
         let cursor_y = modal_area.y + 4; // ボーダー + Path行 + 空行 + Persist行 + Tags行
         f.set_cursor_position((cursor_x, cursor_y));
     }
