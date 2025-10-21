@@ -52,7 +52,10 @@ p() {
 # Auto-record git repositories on directory change
 _pavo_record_hook() {
     if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        pavo add 2>/dev/null
+        local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+        if [ -n "$git_root" ]; then
+            pavo add "$git_root" 2>/dev/null
+        fi
     fi
 }
 
@@ -99,7 +102,10 @@ end
 # Auto-record git repositories on directory change
 function _pavo_record_hook --on-variable PWD
     if git rev-parse --is-inside-work-tree >/dev/null 2>&1
-        pavo add 2>/dev/null
+        set -l git_root (git rev-parse --show-toplevel 2>/dev/null)
+        if test -n "$git_root"
+            pavo add $git_root 2>/dev/null
+        end
     end
 end
 "#
